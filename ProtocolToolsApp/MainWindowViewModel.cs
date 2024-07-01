@@ -1,4 +1,5 @@
 ﻿using CompareCli;
+using DryIoc;
 using Prism.Dialogs;
 using Serilog;
 using System;
@@ -24,8 +25,10 @@ class MainWindowViewModel : BindableBase
 
     private CompareItem? _draftItem;
     private CompareItem? _selectedItem;
+    private bool _isComparing;
 
     private bool _hasItems;
+
     public ReadOnlyObservableCollection<CompareItem> CompareItems { get; }
 
     /// <summary>
@@ -56,6 +59,9 @@ class MainWindowViewModel : BindableBase
 
     public DelegateCommand OpenFileToCompareFromDialogCommand { get; }
 
+    public DelegateCommand OpenProtocolExtractorCommand { get; }
+
+
     public MainWindowViewModel(IDialogService dialogService, CompareCliApi.CliMgr cliMgr)
     {
         _dialogService = dialogService;
@@ -73,25 +79,44 @@ class MainWindowViewModel : BindableBase
         AddItemCommand = new DelegateCommand(AddItem, CanAddItem);
 
         OpenResultCommand = new DelegateCommand(OpenResult, CanOpenResult)
-            .ObservesProperty(() => SelectedItem);
+            .ObservesProperty(() => SelectedItem).ObservesProperty(() => IsComparing);
 
         OpenFolderCommand = new DelegateCommand(OpenFolder, CanOpenFolder)
-            .ObservesProperty(() => SelectedItem);
+            .ObservesProperty(() => SelectedItem).ObservesProperty(() => IsComparing);
 
         DeleteItemCommand = new DelegateCommand(DeleteItem, CanDeleteItem)
-            .ObservesProperty(() => SelectedItem);
+            .ObservesProperty(() => SelectedItem).ObservesProperty(() => IsComparing);
 
-        DeleteAllItemsCommand = new DelegateCommand(DeleteAllItems, CanDeleteAllItems).ObservesProperty(() => HasItems);
+        DeleteAllItemsCommand = new DelegateCommand(DeleteAllItems, CanDeleteAllItems).ObservesProperty(() => HasItems).ObservesProperty(() => IsComparing);
 
         CompareAsyncCommand = new AsyncDelegateCommand(CompareAsync, CanCompareAsync)
-            .ObservesProperty(() => SelectedItem);
+            .ObservesProperty(() => SelectedItem).ObservesProperty(() => IsComparing);
 
-        CompareAllAsyncCommand = new AsyncDelegateCommand(CompareAllAsync, CanCompareAllAsync).ObservesProperty(() => HasItems);
+        CompareAllAsyncCommand = new AsyncDelegateCommand(CompareAllAsync, CanCompareAllAsync).ObservesProperty(() => HasItems).ObservesProperty(() => IsComparing);
 
 
         OpenFileFromDialogReqCommand = new DelegateCommand(OpenFileFromDialogReq, CanOpenFileFromDialogReq);
 
         OpenFileToCompareFromDialogCommand = new DelegateCommand(OpenFileToCompareFromDialog, CanOpenFileToCompareFromDialog);
+
+        OpenProtocolExtractorCommand = new DelegateCommand(OpenProtocolExtractor, CanOpenProtocolExtractor);
+
+    }
+
+    private bool CanOpenProtocolExtractor()
+    {
+        return !Process.GetProcessesByName("ProtocolExtractor").Any();
+    }
+
+    private void OpenProtocolExtractor()
+    {
+        string exePath = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "ProtocolExtractor.exe");
+        Process process = new Process();
+        process.StartInfo.FileName = exePath;
+        process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
+        process.StartInfo.UseShellExecute = true;
+        process.StartInfo.CreateNoWindow = false;
+        process.Start();
     }
 
     public CompareItem? DraftItem
@@ -135,6 +160,12 @@ class MainWindowViewModel : BindableBase
         set => SetProperty(ref _hasItems, value);
     }
 
+    public bool IsComparing
+    {
+        get => _isComparing;
+        set => SetProperty(ref _isComparing, value);
+    }
+
     private CompareRequest? CompareRequest => SelectedItem == null ?
         null : new(SelectedItem.MrType!, SelectedItem.ReqPath!, SelectedItem.ActualPath!);
 
@@ -149,6 +180,7 @@ class MainWindowViewModel : BindableBase
         SelectedItem!.Copy(DraftItem!);
 
         OpenResultCommand?.RaiseCanExecuteChanged();
+        OpenFolderCommand?.RaiseCanExecuteChanged();
     }
 
 
@@ -176,7 +208,7 @@ class MainWindowViewModel : BindableBase
 
 
     private bool CanCompareAllAsync() =>
-        HasItems;
+        HasItems && !IsComparing;
 
 
     private async Task CompareAllAsync()
@@ -186,30 +218,36 @@ class MainWindowViewModel : BindableBase
 
         if (dr != null && dr.Result == ButtonResult.OK)
         {
+            IsComparing = true;
+            _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Start comparing"));
             foreach (CompareItem item in _compareItems)
             {
                 CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
                 try
                 {
                     var result = await _cliMgr.CompareAsync(request);
-
                     _logger.Error("Compare tool success");
                 }
                 catch (Exception ex)
                 {
+                    _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Compare was failed!"));
                     _logger.Error(ex, "Compare tool failed");
                 }
             }
+            _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Compare is done!"));
+            IsComparing = false;
         }
     }
 
 
     private bool CanOpenResult() =>
-        CompareRequest != null && File.Exists(_cliMgr.GetResultsPath(CompareRequest));
-
+        CompareRequest != null && File.Exists(_cliMgr.GetResultsPath(CompareRequest)) && !IsComparing;
+    
 
     private void OpenResult()
     {
+        if (!CanOpenResult()) return;
+
         Process process = new Process();
         process.StartInfo.FileName = _cliMgr.GetResultsPath(CompareRequest!);
         process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
@@ -219,7 +257,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanOpenFolder() =>
-        CompareRequest != null && Directory.Exists(_cliMgr.GetFolderPath(CompareRequest));
+        CompareRequest != null && Directory.Exists(_cliMgr.GetFolderPath(CompareRequest)) && !IsComparing;
 
 
     private void OpenFolder()
@@ -235,7 +273,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanDeleteItem() =>
-        SelectedItem != null;
+        SelectedItem != null && !IsComparing;
 
     private void DeleteItem()
     {
@@ -245,7 +283,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanDeleteAllItems() =>
-        HasItems;
+        HasItems && !IsComparing;
 
     private void DeleteAllItems()
     {
@@ -255,7 +293,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanCompareAsync() =>
-        SelectedItem != null;
+        SelectedItem != null && !IsComparing;
 
     private async Task CompareAsync()
     {
@@ -265,16 +303,22 @@ class MainWindowViewModel : BindableBase
         if (dr != null && dr.Result == ButtonResult.OK)
         {
             CompareRequest request = CompareRequest!;
-
+            IsComparing = true;
             try
             {
+                _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Start comparing"));
                 var result = await _cliMgr.CompareAsync(request);
-
+                _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Compare is done!"));
                 _logger.Error("Compare tool success");
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Compare tool failed");
+                _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Compare was failed!"));
+            }
+            finally
+            {
+                IsComparing = false;
             }
         }
     }
