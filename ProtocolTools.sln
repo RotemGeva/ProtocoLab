@@ -5,7 +5,7 @@ VisualStudioVersion = 17.9.34902.65
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ProtocolToolsApp", "ProtocolToolsApp\ProtocolToolsApp.csproj", "{30A9D31C-158F-46CB-A5C8-B69893B10C0C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CompareCli", "CompareCli\CompareCli.csproj", "{BA5C0D7B-9250-4C50-8246-C536DFBB5C66}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CompareCli", "CompareCli\CompareCli.csproj", "{BA5C0D7B-9250-4C50-8246-C536DFBB5C66}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

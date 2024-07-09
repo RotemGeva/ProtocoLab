@@ -1,16 +1,15 @@
 ﻿using CompareCli;
-using DryIoc;
-using Prism.Dialogs;
 using Serilog;
-using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
-using System.Formats.Tar;
 using System.IO;
-using System.Windows;
 using static CompareCli.CompareCliApi;
+using System.Globalization;
+using CsvHelper;
+using CsvHelper.Configuration;
+using CsvHelper.Configuration.Attributes;
+using System.Reflection;
 
 namespace ProtocolToolsApp;
 
@@ -25,8 +24,8 @@ class MainWindowViewModel : BindableBase
 
     private CompareItem? _draftItem;
     private CompareItem? _selectedItem;
+    
     private bool _isComparing;
-
     private bool _hasItems;
 
     public ReadOnlyObservableCollection<CompareItem> CompareItems { get; }
@@ -60,6 +59,8 @@ class MainWindowViewModel : BindableBase
     public DelegateCommand OpenFileToCompareFromDialogCommand { get; }
 
     public DelegateCommand OpenProtocolExtractorCommand { get; }
+
+    public DelegateCommand UploadInputFileCommand { get; }
 
 
     public MainWindowViewModel(IDialogService dialogService, CompareCliApi.CliMgr cliMgr)
@@ -100,23 +101,9 @@ class MainWindowViewModel : BindableBase
         OpenFileToCompareFromDialogCommand = new DelegateCommand(OpenFileToCompareFromDialog, CanOpenFileToCompareFromDialog);
 
         OpenProtocolExtractorCommand = new DelegateCommand(OpenProtocolExtractor, CanOpenProtocolExtractor);
+        
+        UploadInputFileCommand = new DelegateCommand(UploadInputFile, CanUploadInputFile);
 
-    }
-
-    private bool CanOpenProtocolExtractor()
-    {
-        return !Process.GetProcessesByName("ProtocolExtractor").Any();
-    }
-
-    private void OpenProtocolExtractor()
-    {
-        string exePath = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "ProtocolExtractor.exe");
-        Process process = new Process();
-        process.StartInfo.FileName = exePath;
-        process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
-        process.StartInfo.UseShellExecute = true;
-        process.StartInfo.CreateNoWindow = false;
-        process.Start();
     }
 
     public CompareItem? DraftItem
@@ -193,10 +180,10 @@ class MainWindowViewModel : BindableBase
         if (!CanAddItem())
             return;
 
-        if (Directory.Exists(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", DraftItem!.MrType!)))
+        if (Directory.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", DraftItem!.MrType!)))
         {
             _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=The folder name already exists. " +
-            "Adding will overwrite its current contents during the comparison process."), callback: (dr) =>
+            "If you proceed, the older comparison results in the folder will be retained. Would you like to continue?"), callback: (dr) =>
             {
                 if (dr != null && dr.Result == ButtonResult.OK)
                     _compareItems.Add(new(DraftItem!));
@@ -213,28 +200,36 @@ class MainWindowViewModel : BindableBase
 
     private async Task CompareAllAsync()
     {
+        bool isSuccess = true;
         IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
             "Did you save all your work?"));
 
         if (dr != null && dr.Result == ButtonResult.OK)
         {
             IsComparing = true;
-            _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Start comparing"));
+            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
             foreach (CompareItem item in _compareItems)
             {
                 CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
                 try
                 {
-                    var result = await _cliMgr.CompareAsync(request);
-                    _logger.Error("Compare tool success");
+                    var exitCode = await _cliMgr.CompareAsync(request);
+                    if (exitCode != 0)
+                    {
+                        isSuccess = false;
+                        _logger.Error("Compare with parameters: {@Request} failed", request);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Compare was failed!"));
-                    _logger.Error(ex, "Compare tool failed");
+                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
+                    _logger.Error(ex, "Compare tool failed to execute");
                 }
             }
-            _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Compare is done!"));
+            if (isSuccess)
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process completed successfully!"));
+            else
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process finished with errors. Check log"));
             IsComparing = false;
         }
     }
@@ -248,7 +243,7 @@ class MainWindowViewModel : BindableBase
     {
         if (!CanOpenResult()) return;
 
-        Process process = new Process();
+        Process process = new();
         process.StartInfo.FileName = _cliMgr.GetResultsPath(CompareRequest!);
         process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
         process.StartInfo.UseShellExecute = true;
@@ -289,7 +284,11 @@ class MainWindowViewModel : BindableBase
     {
         if (!CanDeleteAllItems()) return;
 
-        _compareItems.Clear();
+        _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Are you sure you want to delete everything?"), dr =>
+        {
+;           if (dr != null && dr.Result == ButtonResult.OK)
+                _compareItems.Clear();
+        });
     }
 
     private bool CanCompareAsync() =>
@@ -306,15 +305,21 @@ class MainWindowViewModel : BindableBase
             IsComparing = true;
             try
             {
-                _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Start comparing"));
-                var result = await _cliMgr.CompareAsync(request);
-                _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Compare is done!"));
-                _logger.Error("Compare tool success");
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
+                var exitCode = await _cliMgr.CompareAsync(request);
+                if (exitCode != 0)
+                {
+                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare failed"));
+                }
+                else
+                {
+                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare succeded!"));
+                }
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Compare tool failed");
-                _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Compare was failed!"));
+                _logger.Error(ex, "Compare tool failed to execute!");
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
             }
             finally
             {
@@ -332,10 +337,12 @@ class MainWindowViewModel : BindableBase
     {
         if (!CanOpenFileFromDialogReq()) return;
 
-        var dialog = new Microsoft.Win32.OpenFileDialog();
-        dialog.FileName = "Excel File";
-        dialog.DefaultExt = ".xlsx";
-        dialog.Filter = "Excel files (.xlsx)|*.xlsx|All files (*.*)|*.*";
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            FileName = "Excel File",
+            DefaultExt = ".xlsx",
+            Filter = "Excel files (.xlsx)|*.xlsx|All files (*.*)|*.*"
+        };
         bool? result = dialog.ShowDialog();
         if (result == true)
             DraftItem!.ReqPath = dialog.FileName;
@@ -349,12 +356,106 @@ class MainWindowViewModel : BindableBase
     private void OpenFileToCompareFromDialog()
     {
         if (!CanOpenFileToCompareFromDialog()) return;
-        var dialog = new Microsoft.Win32.OpenFileDialog();
-        dialog.FileName = "File to Compare";
-        dialog.DefaultExt = ".tar";
-        dialog.Filter = "(.tar)|*.tar|(.xml)|*.xml|All files (*.*)|*.*";
+
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            FileName = "File to Compare",
+            DefaultExt = ".tar",
+            Filter = "(.tar)|*.tar|(.xml)|*.xml|All files (*.*)|*.*"
+        };
         bool? result = dialog.ShowDialog();
         if (result == true)
             DraftItem!.ActualPath = dialog.FileName;
+    }
+
+    private bool CanOpenProtocolExtractor()
+    {
+        //return !Process.GetProcessesByName("ProtocolExtractor").Any();
+        return true;
+    }
+
+    private void OpenProtocolExtractor()
+    {
+        string exePath = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "ProtocolExtractor.exe");
+        Process process = new();
+        process.StartInfo.FileName = exePath;
+        process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
+        process.StartInfo.UseShellExecute = true;
+        process.StartInfo.CreateNoWindow = false;
+        process.Start();
+    }
+
+    private bool CanUploadInputFile()
+    {
+        return true;
+    }
+
+    private void UploadInputFile()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            FileName = "CSV File",
+            DefaultExt = ".csv",
+            Filter = "CSV files (.csv)|*.csv|All files (*.*)|*.*"
+        };
+        bool? result = dialog.ShowDialog();
+        if (result == true)
+        {
+            try
+            {
+                using (Stream stream = new FileStream(dialog.FileName, FileMode.Open))
+                {
+                    stream.Dispose();
+                    var config = CsvConfiguration.FromAttributes<InputFile>();
+                    using StreamReader reader = new(dialog.FileName);
+                    using var csv = new CsvReader(reader, config);
+                    List<InputFile> records = csv.GetRecords<InputFile>().ToList();
+                    bool isValid = IsInputFileValid(records);
+                    if (isValid)
+                    {
+                        foreach (InputFile record in records)
+                        {
+                            CompareItem itemToAdd = new(record.MrType!, record.ReqPath!, record.ActualPath!);
+                            if (!_compareItems.Contains(itemToAdd))
+                                _compareItems.Add(itemToAdd);
+                        }
+                    }
+                    else
+                        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Input file is invalid. See log"));
+                }
+            }
+            catch
+            {
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Input file must be closed!"));
+            }
+        }
+    }
+
+    private bool IsInputFileValid(List<InputFile> records)
+    {
+        bool isValid = true;
+        foreach ((InputFile record, int index) in records.Select((record, index) => (record, index)))
+        {
+            if (!Path.Exists(record.ReqPath) || !Path.GetExtension(record.ReqPath).Equals(".xlsx"))
+            {
+                isValid = false;
+                _logger.Error("Requirements file path: {ReqPath} is invalid [line: {Index}].", record.ReqPath, index + 1);
+            }
+            if (!Path.Exists(record.ActualPath) || Path.GetExtension(record.ActualPath) != ".tar")
+            {
+                isValid = false;
+                _logger.Error("Actual file path: {ActualPath} is invalid [line: {Index}].", record.ActualPath, index + 1);
+            }
+        }
+        return isValid;
+    }
+
+    [Delimiter(",")]
+    [CultureInfo("en-US")]
+    private class InputFile
+    {
+        public string? MrType { get; set; }
+        public string? ReqPath { get; set; }
+        public string? ActualPath { get; set; }
     }
 }

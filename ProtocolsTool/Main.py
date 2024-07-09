@@ -7,8 +7,8 @@ from ApplicationParameters import ApplicationParameters
 
 # Command line arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("-r", "--req_path", required= True, help="Full path to requirements file")
-parser.add_argument("-t", "--tar_path", required= True, help="Full path to tar file")
+parser.add_argument("-r", "--req_path",required= True, help="Full path to requirements file")
+parser.add_argument("-t", "--tar_path",required= True, help="Full path to tar file")
 args = parser.parse_args()
 
 # Create Log

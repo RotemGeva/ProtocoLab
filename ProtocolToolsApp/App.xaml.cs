@@ -14,16 +14,17 @@ public partial class App : PrismApplication
 {
     protected override Window CreateShell() => Container.Resolve<MainWindow>();
 
-    protected override void Initialize()
+    protected override void RegisterTypes(IContainerRegistry containerRegistry)
     {
-        base.Initialize();
-
+        /// NOTE!
+        /// Logging must be initialized before any type registration that uses logging.
         LoggerConfiguration loggerConfiguration = new LoggerConfiguration()
         .Enrich.WithThreadId()
         .MinimumLevel.Is(LogEventLevel.Verbose);
 
         loggerConfiguration.WriteTo.File(
             path: "ProtocolTools.log",
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] ({SourceContext}) {Message:lj}{NewLine}{Exception}",
             rollingInterval: RollingInterval.Day,
             rollOnFileSizeLimit: true,
             retainedFileCountLimit: 16);
@@ -33,10 +34,7 @@ public partial class App : PrismApplication
         var logger = Log.ForContext<App>();
 
         logger.Information("logging initialized");
-    }
 
-    protected override void RegisterTypes(IContainerRegistry containerRegistry)
-    {
         ViewModelLocationProvider.Register<MainWindow, MainWindowViewModel>();
         containerRegistry.RegisterDialog<NotificationDialog, NotificationDialogViewModel>();
         containerRegistry.RegisterDialog<YesNoDialog, YesNoDialogViewModel>();

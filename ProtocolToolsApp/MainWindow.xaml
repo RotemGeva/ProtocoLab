@@ -8,7 +8,7 @@
         prism:ViewModelLocator.AutoWireViewModel="True"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance local:MainWindowViewModel}"
-        Title="Protocol Automation Tool" Height="520" Width="850">
+        Title="Protocol Automation Tool - v1.0.2.0" Height="540" Width="850">
   <Grid Name="Grid">
     <Grid.RowDefinitions>
       <RowDefinition Height="40"/>
@@ -23,6 +23,7 @@
     </Grid.ColumnDefinitions>
 
     <Button Grid.Row="0" Grid.Column="1" Margin="5" Content="Protocol Extractor" Command="{Binding OpenProtocolExtractorCommand}"/>
+    <Button Grid.Row="1" Grid.Column="1" Margin="5" Content="Upload Input File" Command="{Binding UploadInputFileCommand}"/>
     <StackPanel Name="MrTypeInfo" Grid.Row="0" Grid.Column="0" Orientation="Vertical">
       <TextBlock Text="Enter MRI name (e.g MR30_Premier)"/>
       <TextBox Grid.Row="0" x:Name="MrName" Width="300" HorizontalAlignment="Left"

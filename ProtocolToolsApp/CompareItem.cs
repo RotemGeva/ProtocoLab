@@ -17,6 +17,13 @@ internal class CompareItem : BindableBase, IEquatable<CompareItem>
     {
     }
 
+    public CompareItem(string mrType, string reqPath, string actualPath)
+    {
+        _mrType = mrType;
+        _reqPath = reqPath;
+        _actualPath = actualPath;
+    }
+
     /// <summary>
     /// Copy ctor
     /// </summary>
