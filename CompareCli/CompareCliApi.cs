@@ -52,12 +52,13 @@ public static class CompareCliApi
             {
                 EmptyFolderExceptResults(new DirectoryInfo(resultDir));
             }
+            else
+            {
+                Directory.CreateDirectory(resultDir);
+            }
 
-
-                //if (Directory.Exists(resultDir))
-                //   Directory.Delete(resultDir, true);
-
-                // Directory.CreateDirectory(resultDir);
+            //if (Directory.Exists(resultDir))
+            //   Directory.Delete(resultDir, true);
 
             var reqFileName = $"{request.MrType}_Requirements";
             reqFileName = Path.ChangeExtension(reqFileName, Path.GetExtension(request.RequirementsPath));
