@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Prism.Dialogs;
 
-namespace ProtocolToolsApp;
+namespace ProtocolsToolApp;
 
 internal class DialogViewModelBase : BindableBase, IDialogAware
 {

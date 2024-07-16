@@ -5,7 +5,7 @@ using System.Data;
 using System.Windows;
 using static DryIoc.Setup;
 
-namespace ProtocolToolsApp;
+namespace ProtocolsToolApp;
 
 /// <summary>
 /// Interaction logic for App.xaml
@@ -23,11 +23,11 @@ public partial class App : PrismApplication
         .MinimumLevel.Is(LogEventLevel.Verbose);
 
         loggerConfiguration.WriteTo.File(
-            path: "ProtocolTools.log",
+            path: "ProtocolsTool.log",
             outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] ({SourceContext}) {Message:lj}{NewLine}{Exception}",
             rollingInterval: RollingInterval.Day,
             rollOnFileSizeLimit: true,
-            retainedFileCountLimit: 16);
+            retainedFileCountLimit: 16, shared: true);
 
         Log.Logger = loggerConfiguration.CreateLogger();
 

@@ -10,8 +10,9 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using CsvHelper.Configuration.Attributes;
 using System.Reflection;
+using System.Windows.Navigation;
 
-namespace ProtocolToolsApp;
+namespace ProtocolsToolApp;
 
 class MainWindowViewModel : BindableBase
 {
@@ -40,9 +41,6 @@ class MainWindowViewModel : BindableBase
     /// </summary>
     public DelegateCommand AddItemCommand { get; }
 
-    /// <summary>
-    /// Opens comparison output file if exists.
-    /// </summary>
     public DelegateCommand OpenResultCommand { get; }
 
     public DelegateCommand OpenFolderCommand { get; }
@@ -112,16 +110,18 @@ class MainWindowViewModel : BindableBase
 
         set
         {
+            //Create event handler that will be called.
             void onDraftItemPropertyChanged(object? _, PropertyChangedEventArgs __)
             {
                 UpdateSelectedItemCommand.RaiseCanExecuteChanged();
                 AddItemCommand.RaiseCanExecuteChanged();
             }
 
-            if (value != _draftItem)
+            if (value != _draftItem) //Checks if a new DraftItem object was created (=a row was selected).
             {
                 if (_draftItem != null)
-                    _draftItem.PropertyChanged -= onDraftItemPropertyChanged;
+                    _draftItem.PropertyChanged -= onDraftItemPropertyChanged; 
+                //If textboxes are full, activate event handler so it checks if an update or an adding is needed.
                 if (value != null)
                     value.PropertyChanged += onDraftItemPropertyChanged;
 
@@ -137,6 +137,7 @@ class MainWindowViewModel : BindableBase
         get => _selectedItem;
         set => SetProperty(ref _selectedItem, value, () =>
         {
+            //If a row was selected, put row's data into a new DraftItem => activate set of DraftItem.
             DraftItem = value == null ? new() : new(value);
         });
     }
@@ -200,38 +201,49 @@ class MainWindowViewModel : BindableBase
 
     private async Task CompareAllAsync()
     {
-        bool isSuccess = true;
-        IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
+        Process[] pname = Process.GetProcessesByName("EXCEL");
+        if (pname.Length != 0)//excel is open
+        {
+            IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
             "Did you save all your work?"));
 
-        if (dr != null && dr.Result == ButtonResult.OK)
-        {
-            IsComparing = true;
-            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
-            foreach (CompareItem item in _compareItems)
+            if (dr != null && dr.Result == ButtonResult.OK)
             {
-                CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
-                try
+                await HandleCompareAllAsync();
+            }
+        }
+        else
+            await HandleCompareAllAsync();
+    }
+
+    private async Task HandleCompareAllAsync()
+    {
+        IsComparing = true;
+        bool isSuccess = true;
+        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
+        foreach (CompareItem item in _compareItems)
+        {
+            CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
+            try
+            {
+                var exitCode = await _cliMgr.CompareAsync(request);
+                if (exitCode != 0)
                 {
-                    var exitCode = await _cliMgr.CompareAsync(request);
-                    if (exitCode != 0)
-                    {
-                        isSuccess = false;
-                        _logger.Error("Compare with parameters: {@Request} failed", request);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
-                    _logger.Error(ex, "Compare tool failed to execute");
+                    isSuccess = false;
+                    _logger.Error("Compare with parameters: {@Request} failed", request);
                 }
             }
-            if (isSuccess)
-                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process completed successfully!"));
-            else
-                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process finished with errors. Check log"));
-            IsComparing = false;
+            catch (Exception ex)
+            {
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
+                _logger.Error(ex, "Compare tool failed to execute");
+            }
         }
+        if (isSuccess)
+            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process completed successfully!"));
+        else
+            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process finished with errors. Check log"));
+        IsComparing = false;
     }
 
 
@@ -296,42 +308,43 @@ class MainWindowViewModel : BindableBase
 
     private async Task CompareAsync()
     {
-        IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
+        Process[] pname = Process.GetProcessesByName("EXCEL");
+        if (pname.Length != 0)//excel is open
+        {
+            IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
             "Did you save all your work?"));
 
-        if (dr != null && dr.Result == ButtonResult.OK)
+            if (dr != null && dr.Result == ButtonResult.OK)
+                await HandleCompareAsync();
+        }
+        else
+            await HandleCompareAsync();
+    }
+    private async Task HandleCompareAsync()
+    {
+        CompareRequest request = CompareRequest!;
+        IsComparing = true;
+        try
         {
-            CompareRequest request = CompareRequest!;
-            IsComparing = true;
-            try
-            {
-                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
-                var exitCode = await _cliMgr.CompareAsync(request);
-                if (exitCode != 0)
-                {
-                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare failed"));
-                }
-                else
-                {
-                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare succeded!"));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Compare tool failed to execute!");
-                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
-            }
-            finally
-            {
-                IsComparing = false;
-            }
+            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
+            var exitCode = await _cliMgr.CompareAsync(request);
+            if (exitCode != 0)
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare failed"));
+            else
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare succeded!"));
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Compare tool failed to execute!");
+            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
+        }
+        finally
+        {
+            IsComparing = false;
         }
     }
 
-    private bool CanOpenFileFromDialogReq()
-    {
-        return true;
-    }
+    private bool CanOpenFileFromDialogReq() => true;
 
     private void OpenFileFromDialogReq()
     {
@@ -348,10 +361,7 @@ class MainWindowViewModel : BindableBase
             DraftItem!.ReqPath = dialog.FileName;
     }
 
-    private bool CanOpenFileToCompareFromDialog()
-    {
-        return true;
-    }
+    private bool CanOpenFileToCompareFromDialog() => true;
 
     private void OpenFileToCompareFromDialog()
     {
@@ -368,11 +378,7 @@ class MainWindowViewModel : BindableBase
             DraftItem!.ActualPath = dialog.FileName;
     }
 
-    private bool CanOpenProtocolExtractor()
-    {
-        //return !Process.GetProcessesByName("ProtocolExtractor").Any();
-        return true;
-    }
+    private bool CanOpenProtocolExtractor() => true;
 
     private void OpenProtocolExtractor()
     {
@@ -385,13 +391,18 @@ class MainWindowViewModel : BindableBase
         process.Start();
     }
 
-    private bool CanUploadInputFile()
-    {
-        return true;
-    }
+    private bool CanUploadInputFile() => true;
 
+   
+    /// <summary>
+    /// <param name="latestLog">The most updated log in app's directory</param>
+    /// <param name="records">Contains a list of all values of input file</param>
+    /// <param name="appDirectory">The directory of ProtocolsApp, where logs are created</param>
+    /// </summary>
     private void UploadInputFile()
     {
+        var appDirectory = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!));
+        var latestLog = (from f in appDirectory.GetFiles("*.log") orderby f.LastWriteTime descending select f).First(); // get most updated log
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
             FileName = "CSV File",
@@ -403,9 +414,9 @@ class MainWindowViewModel : BindableBase
         {
             try
             {
-                using (Stream stream = new FileStream(dialog.FileName, FileMode.Open))
+                using (Stream stream = new FileStream(dialog.FileName, FileMode.Open)) // try to open input file.
                 {
-                    stream.Dispose();
+                    stream.Dispose(); // succeded to open input file = input file is closed; closing input file.
                     var config = CsvConfiguration.FromAttributes<InputFile>();
                     using StreamReader reader = new(dialog.FileName);
                     using var csv = new CsvReader(reader, config);
@@ -421,16 +432,22 @@ class MainWindowViewModel : BindableBase
                         }
                     }
                     else
-                        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Input file is invalid. See log"));
+                    {
+                        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Input file has invalid values. See log"));
+                        Process.Start("notepad.exe", latestLog.FullName); // open log with notepad
+                    }
                 }
-            }
-            catch
+            } // file could not open or in is in use
+            catch (Exception ex)
             {
-                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Input file must be closed!"));
+                _logger.Error(ex, "Failed to load input file.");
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Input file is corrupted. See log"));
+                Process.Start("notepad.exe", latestLog.FullName);
             }
         }
     }
 
+    // Checks if CSV input file contains valid values. If not, writes to log the invalid value and line number.
     private bool IsInputFileValid(List<InputFile> records)
     {
         bool isValid = true;
