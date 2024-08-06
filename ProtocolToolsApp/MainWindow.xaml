@@ -8,7 +8,7 @@
         prism:ViewModelLocator.AutoWireViewModel="True"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance local:MainWindowViewModel}"
-        Title="Protocol Automation Tool - v1.0.1.0" Height="540" Width="850">
+        Title="Protocol Automation Tool - v1.0.1.1" Height="540" Width="850">
   <Grid Name="Grid">
     <Grid.RowDefinitions>
       <RowDefinition Height="40"/>
@@ -18,35 +18,36 @@
     </Grid.RowDefinitions>
 
     <Grid.ColumnDefinitions>
-      <ColumnDefinition></ColumnDefinition>
+      <ColumnDefinition Width="203*"></ColumnDefinition>
+      <ColumnDefinition Width="527*"/>
       <ColumnDefinition Width="120"/>
     </Grid.ColumnDefinitions>
 
-    <Button Grid.Row="0" Grid.Column="1" Margin="5" Content="Protocol Extractor" Command="{Binding OpenProtocolExtractorCommand}"/>
-    <Button Grid.Row="1" Grid.Column="1" Margin="5" Content="Upload Input File" Command="{Binding UploadInputFileCommand}"/>
-    <StackPanel Name="MrTypeInfo" Grid.Row="0" Grid.Column="0" Orientation="Vertical">
+    <Button Grid.Row="0" Grid.Column="2" Margin="5,5,5,5" Content="Protocol Extractor" Command="{Binding OpenProtocolExtractorCommand}"/>
+    <Button Grid.Row="1" Grid.Column="2" Margin="5,5,5,5" Content="Upload Input File" Command="{Binding UploadInputFileCommand}"/>
+    <StackPanel Name="MrTypeInfo" Grid.Row="0" Grid.Column="0" Orientation="Vertical" Grid.ColumnSpan="2">
       <TextBlock Text="Enter MRI name (e.g MR30_Premier)"/>
       <TextBox Grid.Row="0" x:Name="MrName" Width="300" HorizontalAlignment="Left"
       Text="{Binding DraftItem.MrType}"/>
     </StackPanel>
 
-    <TextBlock Grid.Row="1" Text="Enter the path of requirements file"/>
-    <StackPanel Name="ReqInfo" Grid.Column="0" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Left">
+    <TextBlock Grid.Row="1" Text="Enter the path of requirements file" Grid.ColumnSpan="2"/>
+    <StackPanel Name="ReqInfo" Grid.Column="0" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Left" Grid.ColumnSpan="2">
       <TextBox Grid.Row="1" x:Name="ReqEntry"  Width="300" Height="20" 
       Text="{Binding DraftItem.ReqPath}"/>
       <Button x:Name="AddFromFileReq" Content="Add from File" Width="100" Height="30" HorizontalAlignment="Center" Grid.Column="0"
     Margin="10" Grid.Row="1" Command="{Binding OpenFileFromDialogReqCommand}"/>
     </StackPanel>
 
-    <TextBlock Text="Enter the path of vendor protocol file (e.g .tar for GE)" Grid.Row="2"/>
-    <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
+    <TextBlock Text="Enter the path of vendor protocol file (e.g .tar for GE)" Grid.Row="2" Grid.ColumnSpan="2"/>
+    <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" Grid.ColumnSpan="2">
       <TextBox Grid.Row="2" Name="TarEntry"  Width="300" Height="20" HorizontalAlignment="Left"
     Text="{Binding DraftItem.ActualPath}"/>
       <Button x:Name="AddFromFile" Content="Add from File" Width="100" Height="30" Margin="10" Command="{Binding OpenFileToCompareFromDialogCommand}"/>
       <Button x:Name="Add" Content="Add to List" Width="100" Height="30" Margin="10" Command="{Binding AddItemCommand}"/>
       <Button x:Name="Update" Content="Update" Width="100" Height="30" Margin="10" Command="{Binding UpdateSelectedItemCommand}"/>
     </StackPanel>
-    <DataGrid Grid.Row="3" Name="dataGrid1" Margin="10,10,10,10" AutoGenerateColumns="False" ItemsSource="{Binding CompareItems}" SelectedItem="{Binding SelectedItem}">
+    <DataGrid Grid.Row="3" Name="dataGrid1" Margin="10,10,10,10" AutoGenerateColumns="False" ItemsSource="{Binding CompareItems}" SelectedItem="{Binding SelectedItem}" Grid.ColumnSpan="2">
       <DataGrid.Columns>
         <DataGridTextColumn Header="MR Type" Binding="{Binding MrType}"/>
         <DataGridTextColumn Header="Requirements" Binding="{Binding ReqPath}"/>
@@ -54,7 +55,7 @@
       </DataGrid.Columns>
     </DataGrid>
 
-    <StackPanel Grid.Column="1" Grid.Row="3" Orientation="Vertical" Margin="10" Height="Auto">
+    <StackPanel Grid.Column="2" Grid.Row="3" Orientation="Vertical" Margin="10,10,10,10" Height="Auto">
       <Button x:Name="Compare" Content="Compare" Width="100" Height="30" Command="{Binding CompareAsyncCommand}"/>
       <Button x:Name="CompareAll" Content="Compare All" Width="100" Height="30" Command="{Binding CompareAllAsyncCommand}"/>
       <Button x:Name="DeleteItem" Content="Delete" Width="100" Height="30" Command="{Binding DeleteItemCommand}"/>
