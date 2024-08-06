@@ -1,6 +1,5 @@
 ﻿using Serilog;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
 
 namespace CompareCli;
@@ -60,8 +59,8 @@ public static class CompareCliApi
             //if (Directory.Exists(resultDir))
             //   Directory.Delete(resultDir, true);
 
-            var reqFileName = $"{request.MrType}_Requirements";
-            reqFileName = Path.ChangeExtension(reqFileName, Path.GetExtension(request.RequirementsPath));
+            var reqFileName = $"{request.MrType}_Requirements.xlsx";
+            //reqFileName = Path.ChangeExtension(reqFileName, Path.GetExtension(request.RequirementsPath)); - didn't work for path with '.'
             var reqFilePath = Path.Combine(resultDir, reqFileName);
 
             File.Copy(request.RequirementsPath, reqFilePath);

@@ -38,7 +38,8 @@ class Compare:
             sys.exit()
         except Exception as err:
             logging.error(f'Compare Error: {err}')
-            messagebox.showerror('ERROR', f'Compare Error: {err}')
+            sys.exit(1)
+            #messagebox.showerror('ERROR', f'Compare Error: {err}')
 
     def extract_tar(self):
         logging.info(f'Start to extract TAR file')
