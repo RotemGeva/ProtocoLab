@@ -10,7 +10,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using CsvHelper.Configuration.Attributes;
 using System.Reflection;
-using System.Windows.Navigation;
+
 
 namespace ProtocolsToolApp;
 
@@ -166,6 +166,7 @@ class MainWindowViewModel : BindableBase
             return;
 
         SelectedItem!.Copy(DraftItem!);
+        SelectedItem.ExecutionStatus = "";
 
         OpenResultCommand?.RaiseCanExecuteChanged();
         OpenFolderCommand?.RaiseCanExecuteChanged();
@@ -226,23 +227,28 @@ class MainWindowViewModel : BindableBase
             CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
             try
             {
+                item.ExecutionStatus = "Running...";
                 var exitCode = await _cliMgr.CompareAsync(request);
                 if (exitCode != 0)
                 {
                     isSuccess = false;
+                    item.ExecutionStatus = "Failed";
                     _logger.Error("Compare with parameters: {@Request} failed", request);
                 }
+                else
+                    item.ExecutionStatus = "Succeeded";
             }
             catch (Exception ex)
             {
                 _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
+                item.ExecutionStatus = "Failed";
                 _logger.Error(ex, "Compare tool failed to execute");
             }
         }
         if (isSuccess)
-            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process completed successfully!"));
+            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=All terminated successfully!"));
         else
-            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process finished with errors. Check log"));
+            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Comparison process terminated with errors. Check log"));
         IsComparing = false;
     }
 
@@ -327,16 +333,24 @@ class MainWindowViewModel : BindableBase
         try
         {
             _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
+            SelectedItem!.ExecutionStatus = "Running...";
             var exitCode = await _cliMgr.CompareAsync(request);
             if (exitCode != 0)
+            {
                 _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare failed"));
+                SelectedItem!.ExecutionStatus = "Failed";
+            }
             else
+            {
                 _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare succeded!"));
+                SelectedItem!.ExecutionStatus = "Succeeded";
+            }
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Compare tool failed to execute!");
             _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
+            SelectedItem!.ExecutionStatus = "Failed";
         }
         finally
         {

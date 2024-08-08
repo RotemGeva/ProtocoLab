@@ -52,6 +52,7 @@
         <DataGridTextColumn Header="MR Type" Binding="{Binding MrType}"/>
         <DataGridTextColumn Header="Requirements" Binding="{Binding ReqPath}"/>
         <DataGridTextColumn Header="File to Compare" Binding="{Binding ActualPath}"/>
+        <DataGridTextColumn Header="Execution Status" Binding="{Binding ExecutionStatus}"/>
       </DataGrid.Columns>
     </DataGrid>
 

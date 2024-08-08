@@ -12,6 +12,7 @@ internal class CompareItem : BindableBase, IEquatable<CompareItem>
     private string? _mrType;
     private string? _reqPath;
     private string? _actualPath;
+    private string? _executionStatus;
 
     public CompareItem()
     {
@@ -22,6 +23,7 @@ internal class CompareItem : BindableBase, IEquatable<CompareItem>
         _mrType = mrType;
         _reqPath = reqPath;
         _actualPath = actualPath;
+        _executionStatus = "";
     }
 
     /// <summary>
@@ -48,6 +50,12 @@ internal class CompareItem : BindableBase, IEquatable<CompareItem>
     {
         get => _actualPath;
         set => SetProperty(ref _actualPath, value);
+    }
+
+    public string? ExecutionStatus
+    {
+        get => _executionStatus;
+        set => SetProperty(ref _executionStatus, value);
     }
 
     public bool IsValid =>

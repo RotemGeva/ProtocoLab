@@ -48,16 +48,9 @@ public static class CompareCliApi
             var resultDir = Path.Combine(CompareDataDir, request.MrType);
 
             if (Directory.Exists(resultDir))
-            {
                 EmptyFolderExceptResults(new DirectoryInfo(resultDir));
-            }
             else
-            {
                 Directory.CreateDirectory(resultDir);
-            }
-
-            //if (Directory.Exists(resultDir))
-            //   Directory.Delete(resultDir, true);
 
             var reqFileName = $"{request.MrType}_Requirements.xlsx";
             //reqFileName = Path.ChangeExtension(reqFileName, Path.GetExtension(request.RequirementsPath)); - didn't work for path with '.'
