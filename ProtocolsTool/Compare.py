@@ -9,7 +9,6 @@ import sys
 import tarfile
 from pathlib import Path
 import re
-from tkinter import messagebox
 
 
 def resource_path(relative_path):
@@ -39,7 +38,6 @@ class Compare:
         except Exception as err:
             logging.error(f'Compare Error: {err}')
             sys.exit(1)
-            #messagebox.showerror('ERROR', f'Compare Error: {err}')
 
     def extract_tar(self):
         logging.info(f'Start to extract TAR file')
@@ -49,7 +47,8 @@ class Compare:
             logging.info(f'Could not load TAR file.\nError: {err}')
             raise Exception(f'Could not load TAR file.\nError: {err}')
         try:
-            my_tar.extractall(f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}')  # specify which folder to extract to
+            my_tar.extractall(f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}')  # specify which folder to
+            # extract to
         except Exception as err:
             logging.info(f'Could not extract TAR file to {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}.\nError: {err}')
             raise Exception(f'Could not extract TAR file to {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}.\nError: {err}')
