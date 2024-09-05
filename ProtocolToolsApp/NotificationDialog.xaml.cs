@@ -13,7 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace ProtocolsToolApp
+namespace ProtocoLab
 {
     /// <summary>
     /// Interaction logic for NotificationDialog.xaml

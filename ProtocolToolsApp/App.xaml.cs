@@ -1,11 +1,9 @@
 ﻿using Serilog;
 using Serilog.Events;
-using System.Configuration;
-using System.Data;
+using System.IO;
 using System.Windows;
-using static DryIoc.Setup;
 
-namespace ProtocolsToolApp;
+namespace ProtocoLab;
 
 /// <summary>
 /// Interaction logic for App.xaml
@@ -16,6 +14,12 @@ public partial class App : PrismApplication
 
     protected override void RegisterTypes(IContainerRegistry containerRegistry)
     {
+        // Initialize log folder
+        string logsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
+
+        if (!Directory.Exists(logsFolderPath))
+            Directory.CreateDirectory(logsFolderPath);
+
         /// NOTE!
         /// Logging must be initialized before any type registration that uses logging.
         LoggerConfiguration loggerConfiguration = new LoggerConfiguration()
@@ -23,7 +27,7 @@ public partial class App : PrismApplication
         .MinimumLevel.Is(LogEventLevel.Verbose);
 
         loggerConfiguration.WriteTo.File(
-            path: "ProtocolsTool.log",
+            path: "Logs/ProtocoLab.log",
             outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] ({SourceContext}) {Message:lj}{NewLine}{Exception}",
             rollingInterval: RollingInterval.Day,
             rollOnFileSizeLimit: true,

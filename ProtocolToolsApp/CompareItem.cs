@@ -5,10 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ProtocolsToolApp;
+namespace ProtocoLab;
 
 internal class CompareItem : BindableBase, IEquatable<CompareItem>
 {
+    private bool _isSelected;
     private string? _mrType;
     private string? _reqPath;
     private string? _actualPath;
@@ -32,6 +33,12 @@ internal class CompareItem : BindableBase, IEquatable<CompareItem>
     public CompareItem(CompareItem other)
     {
         Copy(other);
+    }
+
+    public bool IsSelected 
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
     }
 
     public string? MrType

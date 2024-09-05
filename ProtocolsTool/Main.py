@@ -1,5 +1,6 @@
 import logging
 import argparse
+import os.path
 from datetime import datetime
 from pathlib import Path
 from Compare import Compare
@@ -20,12 +21,16 @@ parameters.path_for_tar = args.tar_path
 mr_name = Path(parameters.path_for_req).name.replace('_Requirements.xlsx', '')
 
 # Create Log
+log_folder = os.path.join(os.getcwd(), "CompareLogs")
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
 data_and_time = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 log_name = f'{mr_name}_{data_and_time}.log'
-logging.basicConfig(filemode='w', filename=log_name, format='%(asctime)s.%(msecs)03d %(levelname)-8s %(funcName)-32s '
-                                                            '%(message)s', datefmt='%d-%m-%Y %H:%M:%S',
+logging.basicConfig(filemode='w', filename=os.path.join(log_folder, log_name),
+                    format='%(asctime)s.%(msecs)03d %(levelname)-8s %('
+                           'funcName)-32s'
+                           '%(message)s', datefmt='%d-%m-%Y %H:%M:%S',
                     level=logging.INFO)
-logging.info(f"Logging initialized with {parameters.path_for_req}, {parameters.path_for_tar}")
 
 # Compare
 Compare(parameters)

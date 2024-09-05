@@ -10,9 +10,10 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using CsvHelper.Configuration.Attributes;
 using System.Reflection;
+using System.Collections.Specialized;
 
 
-namespace ProtocolsToolApp;
+namespace ProtocoLab;
 
 class MainWindowViewModel : BindableBase
 {
@@ -28,6 +29,7 @@ class MainWindowViewModel : BindableBase
     
     private bool _isComparing;
     private bool _hasItems;
+    private bool _hasSelectedItems;
 
     public ReadOnlyObservableCollection<CompareItem> CompareItems { get; }
 
@@ -69,7 +71,11 @@ class MainWindowViewModel : BindableBase
 
         DraftItem = new();
 
-        _compareItems.CollectionChanged += (_, __) => HasItems = _compareItems.Any();
+        _compareItems.CollectionChanged += (_, e) =>
+        {
+            HasItems = _compareItems.Any();
+            compareItemsChanged(_, e);
+        };
 
         UpdateSelectedItemCommand = new DelegateCommand(UpdateSelectedItem, CanUpdateSelectedItem)
             .ObservesProperty(() => SelectedItem)
@@ -89,10 +95,11 @@ class MainWindowViewModel : BindableBase
         DeleteAllItemsCommand = new DelegateCommand(DeleteAllItems, CanDeleteAllItems).ObservesProperty(() => HasItems).ObservesProperty(() => IsComparing);
 
         CompareAsyncCommand = new AsyncDelegateCommand(CompareAsync, CanCompareAsync)
-            .ObservesProperty(() => SelectedItem).ObservesProperty(() => IsComparing);
+            //.ObservesProperty(() => SelectedItem)
+            .ObservesProperty(() => HasSelectedItems)
+            .ObservesProperty(() => IsComparing);
 
         CompareAllAsyncCommand = new AsyncDelegateCommand(CompareAllAsync, CanCompareAllAsync).ObservesProperty(() => HasItems).ObservesProperty(() => IsComparing);
-
 
         OpenFileFromDialogReqCommand = new DelegateCommand(OpenFileFromDialogReq, CanOpenFileFromDialogReq);
 
@@ -102,7 +109,45 @@ class MainWindowViewModel : BindableBase
         
         UploadInputFileCommand = new DelegateCommand(UploadInputFile, CanUploadInputFile);
 
+        void compareItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            switch (e.Action)
+            {
+                // NewItems: represents the items that were added to or replaced in the collection 
+                case NotifyCollectionChangedAction.Add:
+                    foreach (CompareItem item in e.NewItems!)
+                        item.PropertyChanged += onItemPropertyChanged;
+                    break;
+                case NotifyCollectionChangedAction.Remove:
+                    HasSelectedItems = _compareItems.Any(x => x.IsSelected);
+                    foreach (CompareItem item in e.OldItems!)
+                        item.PropertyChanged -= onItemPropertyChanged;
+                    break;
+                case NotifyCollectionChangedAction.Replace:
+                    break;
+                case NotifyCollectionChangedAction.Move:
+                    break;
+                case NotifyCollectionChangedAction.Reset:
+                    break;
+                default:
+                    break;
+            }
+
+        }
+
+        void onItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(CompareItem.IsSelected):
+                    HasSelectedItems = _compareItems.Any(x => x.IsSelected);
+                    break;
+            }
+        }
+
     }
+
+
 
     public CompareItem? DraftItem
     {
@@ -146,6 +191,12 @@ class MainWindowViewModel : BindableBase
     {
         get => _hasItems;
         set => SetProperty(ref _hasItems, value);
+    }
+
+    public bool HasSelectedItems
+    {
+        get => _hasSelectedItems;
+        set => SetProperty(ref _hasSelectedItems, value);
     }
 
     public bool IsComparing
@@ -195,7 +246,27 @@ class MainWindowViewModel : BindableBase
             _compareItems.Add(new(DraftItem!));
     }
 
+    private bool CanCompareAsync() =>
+        HasSelectedItems && !IsComparing;
 
+    private async Task CompareAsync()
+    {
+        Process[] pname = Process.GetProcessesByName("EXCEL");
+        if (pname.Length != 0)//excel is open
+        {
+            IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
+            "Did you save all your work?"));
+
+            if (dr != null && dr.Result == ButtonResult.OK)
+                await HandleCompareAsync();
+        }
+        else
+            await HandleCompareAsync();
+    }
+    private async Task HandleCompareAsync()
+    {
+        await HandleCompareAllAsync(selectedOnly: true);
+    }
     private bool CanCompareAllAsync() =>
         HasItems && !IsComparing;
 
@@ -217,12 +288,19 @@ class MainWindowViewModel : BindableBase
             await HandleCompareAllAsync();
     }
 
-    private async Task HandleCompareAllAsync()
+    private async Task HandleCompareAllAsync(bool selectedOnly = false)
     {
         IsComparing = true;
+
+        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing..."));
+
+        var itemsToCompare = selectedOnly ? _compareItems.Where(x => x.IsSelected) : _compareItems;
+
+        foreach (CompareItem item in itemsToCompare) // Restarting execution status
+            item.ExecutionStatus = "";
+
         bool isSuccess = true;
-        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
-        foreach (CompareItem item in _compareItems)
+        foreach (CompareItem item in itemsToCompare)
         {
             CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
             try
@@ -309,54 +387,7 @@ class MainWindowViewModel : BindableBase
         });
     }
 
-    private bool CanCompareAsync() =>
-        SelectedItem != null && !IsComparing;
 
-    private async Task CompareAsync()
-    {
-        Process[] pname = Process.GetProcessesByName("EXCEL");
-        if (pname.Length != 0)//excel is open
-        {
-            IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
-            "Did you save all your work?"));
-
-            if (dr != null && dr.Result == ButtonResult.OK)
-                await HandleCompareAsync();
-        }
-        else
-            await HandleCompareAsync();
-    }
-    private async Task HandleCompareAsync()
-    {
-        CompareRequest request = CompareRequest!;
-        IsComparing = true;
-        try
-        {
-            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing"));
-            SelectedItem!.ExecutionStatus = "Running...";
-            var exitCode = await _cliMgr.CompareAsync(request);
-            if (exitCode != 0)
-            {
-                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare failed"));
-                SelectedItem!.ExecutionStatus = "Failed";
-            }
-            else
-            {
-                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare succeded!"));
-                SelectedItem!.ExecutionStatus = "Succeeded";
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(ex, "Compare tool failed to execute!");
-            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
-            SelectedItem!.ExecutionStatus = "Failed";
-        }
-        finally
-        {
-            IsComparing = false;
-        }
-    }
 
     private bool CanOpenFileFromDialogReq() => true;
 
