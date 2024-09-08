@@ -13,8 +13,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Folder Include="cli\" />
-		<Content Include="cli\**">
+		<Content Include="cli\**\*">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>

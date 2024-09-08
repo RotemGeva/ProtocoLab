@@ -70,6 +70,7 @@
       <Button x:Name="DeleteAllItems" Content="Delete All" Width="100" Height="30" Command="{Binding DeleteAllItemsCommand}"/>
       <Button x:Name="OpenRes" Content="Open Result" Width="100" Height="30" Command="{Binding OpenResultCommand}"/>
       <Button x:Name="OpenFolder" Content="Open Folder" Width="100" Height="30" Command="{Binding OpenFolderCommand}"/>
+      <Button x:Name="OpenLog" Content="Open Latest Log" Width="100" Height="30" Command="{Binding OpenLatestLogCommand}"/>
     </StackPanel>
   </Grid>
 </Window>

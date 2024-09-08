@@ -62,6 +62,8 @@ class MainWindowViewModel : BindableBase
 
     public DelegateCommand UploadInputFileCommand { get; }
 
+    public DelegateCommand OpenLatestLogCommand { get; }
+
 
     public MainWindowViewModel(IDialogService dialogService, CompareCliApi.CliMgr cliMgr)
     {
@@ -109,6 +111,8 @@ class MainWindowViewModel : BindableBase
         
         UploadInputFileCommand = new DelegateCommand(UploadInputFile, CanUploadInputFile);
 
+        OpenLatestLogCommand = new DelegateCommand(OpenLatestLog, CanOpenLatestLog);
+
         void compareItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             switch (e.Action)
@@ -146,7 +150,6 @@ class MainWindowViewModel : BindableBase
         }
 
     }
-
 
 
     public CompareItem? DraftItem
@@ -427,13 +430,26 @@ class MainWindowViewModel : BindableBase
 
     private void OpenProtocolExtractor()
     {
-        string exePath = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "ProtocolExtractor.exe");
-        Process process = new();
-        process.StartInfo.FileName = exePath;
-        process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
-        process.StartInfo.UseShellExecute = true;
-        process.StartInfo.CreateNoWindow = false;
-        process.Start();
+        string tempFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "temp");
+        try
+        {
+            if (Directory.Exists(tempFolder))
+            {
+                Directory.Delete(tempFolder, recursive: true);
+                _logger.Information("Deleted temp folder successfully.");
+            }
+            string exePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "ProtocolExtractor.exe");
+            Process process = new();
+            process.StartInfo.FileName = exePath;
+            process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
+            process.StartInfo.UseShellExecute = true;
+            process.StartInfo.CreateNoWindow = false;
+            process.Start();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to execute ProtocolExtractor.");
+        }
     }
 
     private bool CanUploadInputFile() => true;
@@ -446,7 +462,7 @@ class MainWindowViewModel : BindableBase
     /// </summary>
     private void UploadInputFile()
     {
-        var appDirectory = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!));
+        var appDirectory = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!));
         var latestLog = (from f in appDirectory.GetFiles("*.log") orderby f.LastWriteTime descending select f).First(); // get most updated log
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
@@ -491,6 +507,26 @@ class MainWindowViewModel : BindableBase
             }
         }
     }
+
+    private bool CanOpenLatestLog()
+    {
+        string logsPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "CompareLogs");
+        if (Directory.Exists(logsPath))
+        {
+            if (!Directory.EnumerateFileSystemEntries(logsPath).Any()) // Check if CompareLogs is empty.
+                return false;
+            else return true;
+        }
+        return false;
+    }
+
+    private void OpenLatestLog()
+    {
+        var logsFolder = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "CompareLogs"));
+        var latestLog = (from f in logsFolder.GetFiles("*.log") orderby f.LastWriteTime descending select f).First();
+        Process.Start("notepad.exe", latestLog.FullName);
+    }
+
 
     // Checks if CSV input file contains valid values. If not, writes to log the invalid value and line number.
     private bool IsInputFileValid(List<InputFile> records)
