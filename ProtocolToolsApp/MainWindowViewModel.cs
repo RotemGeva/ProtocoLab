@@ -510,7 +510,7 @@ class MainWindowViewModel : BindableBase
 
     private bool CanOpenLatestLog()
     {
-        string logsPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "CompareLogs");
+        string logsPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "CompareLogs");
         if (Directory.Exists(logsPath))
         {
             if (!Directory.EnumerateFileSystemEntries(logsPath).Any()) // Check if CompareLogs is empty.
