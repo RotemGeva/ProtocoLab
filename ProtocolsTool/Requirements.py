@@ -1,10 +1,14 @@
 import logging
+import sys
+
 import openpyxl
 import os
 import win32com
 
-from Compare import resource_path
-
+def resource_path(relative_path):
+    # """ Get absolute path to resource, works for dev and for PyInstaller """
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
 
 def excel_rearrangement(mr_name, macro_excel_file):
     logging.info(f'Start working on {mr_name}_Requirements.xlsx')

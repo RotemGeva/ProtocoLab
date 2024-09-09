@@ -441,8 +441,8 @@ class MainWindowViewModel : BindableBase
             string exePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "ProtocolExtractor.exe");
             Process process = new();
             process.StartInfo.FileName = exePath;
-            process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
-            process.StartInfo.UseShellExecute = true;
+            process.StartInfo.WorkingDirectory = Path.GetDirectoryName(exePath);
+            process.StartInfo.UseShellExecute = false;
             process.StartInfo.CreateNoWindow = false;
             process.Start();
         }
@@ -522,7 +522,7 @@ class MainWindowViewModel : BindableBase
 
     private void OpenLatestLog()
     {
-        var logsFolder = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "CompareLogs"));
+        var logsFolder = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "CompareLogs"));
         var latestLog = (from f in logsFolder.GetFiles("*.log") orderby f.LastWriteTime descending select f).First();
         Process.Start("notepad.exe", latestLog.FullName);
     }

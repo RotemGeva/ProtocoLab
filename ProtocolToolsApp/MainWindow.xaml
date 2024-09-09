@@ -49,7 +49,7 @@
     </StackPanel>
     <DataGrid Grid.Row="3" Name="dataGrid1" Margin="10,10,10,10" AutoGenerateColumns="False" ItemsSource="{Binding CompareItems}" SelectedItem="{Binding SelectedItem}" Grid.ColumnSpan="2">
       <DataGrid.Columns>
-        <DataGridTemplateColumn  Header="Select to Compare">
+        <DataGridTemplateColumn  Header="">
           <DataGridTemplateColumn.CellTemplate>
             <DataTemplate>
               <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" />
