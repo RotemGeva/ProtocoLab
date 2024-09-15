@@ -11,6 +11,11 @@ using CsvHelper.Configuration;
 using CsvHelper.Configuration.Attributes;
 using System.Reflection;
 using System.Collections.Specialized;
+using ICSharpCode.SharpZipLib.Tar;
+using System.Text.RegularExpressions;
+using DryIoc;
+using Prism.Dialogs;
+
 
 
 namespace ProtocoLab;
@@ -64,6 +69,8 @@ class MainWindowViewModel : BindableBase
 
     public DelegateCommand OpenLatestLogCommand { get; }
 
+    public DelegateCommand MakeRequirementsCommand { get; }
+
 
     public MainWindowViewModel(IDialogService dialogService, CompareCliApi.CliMgr cliMgr)
     {
@@ -113,6 +120,8 @@ class MainWindowViewModel : BindableBase
 
         OpenLatestLogCommand = new DelegateCommand(OpenLatestLog, CanOpenLatestLog);
 
+        MakeRequirementsCommand = new DelegateCommand(MakeRequirements, CanMakeRequirements).ObservesProperty(() => DraftItem.ActualPath);
+
         void compareItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             switch (e.Action)
@@ -151,7 +160,7 @@ class MainWindowViewModel : BindableBase
 
     }
 
-
+    
     public CompareItem? DraftItem
     {
         get => _draftItem;
@@ -462,7 +471,7 @@ class MainWindowViewModel : BindableBase
     /// </summary>
     private void UploadInputFile()
     {
-        var appDirectory = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!));
+        var appDirectory = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "Logs"));
         var latestLog = (from f in appDirectory.GetFiles("*.log") orderby f.LastWriteTime descending select f).First(); // get most updated log
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
@@ -505,6 +514,118 @@ class MainWindowViewModel : BindableBase
                 _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Input file is corrupted. See log"));
                 Process.Start("notepad.exe", latestLog.FullName);
             }
+        }
+    }
+
+    private bool CanMakeRequirements()
+    {
+        return DraftItem!.ActualPath != null && File.Exists(DraftItem.ActualPath);
+    }
+
+    private void MakeRequirements()
+    {
+        string TarExtractFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "TarExtractFolder");
+        ExtractTar(DraftItem!.ActualPath!, TarExtractFolder);
+        List<string> matchingFolders = ExtractProtocolName(TarExtractFolder);
+        var parameters = new DialogParameters
+        {
+            { "items", matchingFolders }
+        };
+
+        _dialogService.ShowDialog(nameof(SelectionDialog), parameters, result =>
+        {
+            if (result.Result == ButtonResult.OK)
+            {
+                // Handle OK result
+                var selectedProtocol = result.Parameters.GetValue<string>("SelectedProtocol");
+                // Use the selected protocol as needed
+            }
+            else if (result.Result == ButtonResult.Cancel)
+            {
+                // Handle Cancel result
+            }
+        });
+
+        /// <summary>
+        /// Extracts the contents of a tar file to a specified directory.
+        /// </summary>
+        /// <param name="tarFilePath">The path to the tar file.</param>
+        /// <param name="destinationFolder">The directory to extract the tar file into.</param>
+        void ExtractTar(string tarFilePath, string destinationFolder)
+        {
+            if (Directory.Exists(destinationFolder))
+                Directory.Delete(destinationFolder, true);
+            Directory.CreateDirectory(destinationFolder);
+
+            try
+            {
+                using (var tarStream = new FileStream(tarFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var tarArchive = new TarInputStream(tarStream))
+                {
+                    TarEntry entry;
+                    while ((entry = tarArchive.GetNextEntry()) != null)
+                    {
+                        // Combine the destination path with the entry name
+                        var entryPath = Path.Combine(destinationFolder, entry.Name);
+
+                        if (entry.IsDirectory)
+                            // Ensure directory exists
+                            Directory.CreateDirectory(entryPath);
+                        else
+                        {
+                            // Ensure directory exists
+                            var entryDirectory = Path.GetDirectoryName(entryPath);
+                            if (!Directory.Exists(entryDirectory))
+                                Directory.CreateDirectory(entryDirectory);
+
+                            // Extract the file
+                            using (var entryStream = File.Create(entryPath))
+                            {
+                                tarArchive.CopyEntryContents(entryStream);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Failed to extract tar file.");
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Tar file could not be extracted. See log"));
+            }
+        }
+        /// <summary>
+        /// Extracts protocol name from a directory that contains tar content.
+        /// </summary>
+        /// <param name="directoryPath">The path of the directory that contains the protocols.</param>
+        List<string> ExtractProtocolName(string directoryPath)
+        {
+            // Regex pattern to match folder names
+            var pattern = @"^adult_other_(.+?)_\d+_\d+$";
+            var regex = new Regex(pattern, RegexOptions.Compiled);
+
+            // List to store matching folder names
+            List<string> matchingFolders = new List<string>();
+
+            // Get all folder names in the directory
+            var folderNames = Directory.GetDirectories(directoryPath);
+
+            foreach (var folderPath in folderNames)
+            {
+                var folderName = Path.GetFileName(folderPath);
+
+                // Match the folder name with the regex pattern
+                var match = regex.Match(folderName);
+
+                if (match.Success)
+                {
+                    // Extract the captured group
+                    var extractedName = match.Groups[1].Value;
+
+                    // Add the matching name to the list
+                    matchingFolders.Add(extractedName);
+                }
+            }
+            return matchingFolders;
         }
     }
 

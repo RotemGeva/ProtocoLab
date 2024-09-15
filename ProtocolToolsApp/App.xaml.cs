@@ -40,6 +40,7 @@ public partial class App : PrismApplication
         logger.Information("logging initialized");
 
         ViewModelLocationProvider.Register<MainWindow, MainWindowViewModel>();
+        containerRegistry.RegisterDialog<SelectionDialog, SelectionDialogViewModel>();
         containerRegistry.RegisterDialog<NotificationDialog, NotificationDialogViewModel>();
         containerRegistry.RegisterDialog<YesNoDialog, YesNoDialogViewModel>();
     }

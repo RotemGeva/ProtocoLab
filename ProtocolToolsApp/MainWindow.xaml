@@ -11,25 +11,26 @@
         Title="ProtocoLab - 1.0.3.0" Height="600" Width="970">
   <Grid Name="Grid">
     <Grid.RowDefinitions>
-      <RowDefinition Height="40"/>
+      <RowDefinition Height="50"/>
       <RowDefinition Height="50"/>
       <RowDefinition Height="50"/>
       <RowDefinition Height="350"/>
     </Grid.RowDefinitions>
 
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="203*"></ColumnDefinition>
+      <ColumnDefinition Width="500*"></ColumnDefinition>
       <ColumnDefinition Width="527*"/>
       <ColumnDefinition Width="120"/>
     </Grid.ColumnDefinitions>
 
-    <Button Grid.Row="0" Grid.Column="2" Margin="5,5,5,5" Content="Protocol Extractor" Command="{Binding OpenProtocolExtractorCommand}"/>
-    <Button Grid.Row="1" Grid.Column="2" Margin="5,5,5,5" Content="Upload Input File" Command="{Binding UploadInputFileCommand}"/>
-    <StackPanel Name="MrTypeInfo" Grid.Row="0" Grid.Column="0" Orientation="Vertical" Grid.ColumnSpan="2">
-      <TextBlock Text="Enter MRI name (e.g MR30_Premier)"/>
-      <TextBox Grid.Row="0" x:Name="MrName" Width="300" HorizontalAlignment="Left"
-      Text="{Binding DraftItem.MrType}"/>
+    <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal">
+      <StackPanel Name="MrTypeInfo" Grid.Row="0" Grid.Column="0" Orientation="Vertical" Grid.ColumnSpan="2">
+        <TextBlock Text="Enter MRI name (e.g MR30_Premier)"/>
+        <TextBox Grid.Row="0" x:Name="MrName" Width="300" HorizontalAlignment="Left" Text="{Binding DraftItem.MrType}"/>
+      </StackPanel>
+      <Button Grid.Row="0" Grid.Column="1" Width="100" Height="30" Content="Upload Input File" Margin="7" Command="{Binding UploadInputFileCommand}"/>
     </StackPanel>
+
 
     <TextBlock Grid.Row="1" Text="Enter the path of requirements file" Grid.ColumnSpan="2"/>
     <StackPanel Name="ReqInfo" Grid.Column="0" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Left" Grid.ColumnSpan="2">
@@ -46,6 +47,7 @@
       <Button x:Name="AddFromFile" Content="Add from File" Width="100" Height="30" Margin="10" Command="{Binding OpenFileToCompareFromDialogCommand}"/>
       <Button x:Name="Add" Content="Add to List" Width="100" Height="30" Margin="10" Command="{Binding AddItemCommand}"/>
       <Button x:Name="Update" Content="Update" Width="100" Height="30" Margin="10" Command="{Binding UpdateSelectedItemCommand}"/>
+      <Button x:Name="MakeReq" Content="Make Req" Width="100" Height="30" Margin="10" Command="{Binding MakeRequirementsCommand}"/>
     </StackPanel>
     <DataGrid Grid.Row="3" Name="dataGrid1" Margin="10,10,10,10" AutoGenerateColumns="False" ItemsSource="{Binding CompareItems}" SelectedItem="{Binding SelectedItem}" Grid.ColumnSpan="2">
       <DataGrid.Columns>
