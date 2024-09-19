@@ -12,6 +12,8 @@ public static class CompareCliApi
     public record CompareRequest(string MrType, string RequirementsPath, string ActualDataPath);
     public record CompareResult();
 
+    public record MakeReqRequest(string DataPath, List<string> Protocols);
+    public record MakeReqResult();
     public class CliMgr
     {
         private static readonly ILogger _logger = Log.ForContext<CliMgr>();
@@ -37,6 +39,36 @@ public static class CompareCliApi
                     file.Delete();
             }
             foreach (DirectoryInfo subDirectory in directory.GetDirectories()) subDirectory.Delete(true);
+        }
+
+        public async Task<int> MakeReqAsync(MakeReqRequest request, CancellationToken ct = default)
+        {
+            void killProcesses(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
+            var resultDir = Path.Combine(CompareDataDir, "Requirements");
+            Directory.CreateDirectory(resultDir);
+            _logger.Debug("Making requirements. The request: {@Request}", request);
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = CompareExePath,
+                WorkingDirectory = Path.GetDirectoryName(CompareExePath),
+                Arguments = $@"-t {"\"" + request.DataPath + "\""} -f r",
+                // Added double quotes to allow arguments with spaces
+                CreateNoWindow = true
+            };
+
+            ProcessExtensions.StartProcessRequest startRequest = new(startInfo);
+
+            startRequest.OnOutputLine += (line) => _logger.Debug(line);
+            startRequest.OnErrorLine += (line) => _logger.Warning(line);
+
+            _logger.Debug("Starting external tool with request: {@Request}", startRequest);
+
+            killProcesses("EXCEL");
+            var exitCode = await startRequest.RunProcessAsync().ConfigureAwait(false);
+
+            _logger.Debug("External tool done with code: {ExitCode}", exitCode);
+
+            return exitCode;
         }
 
         public async Task<int> CompareAsync(CompareRequest request, CancellationToken ct = default)
@@ -72,12 +104,12 @@ public static class CompareCliApi
             startRequest.OnOutputLine += (line) => _logger.Debug(line);
             startRequest.OnErrorLine += (line) => _logger.Warning(line);
 
-            _logger.Debug("Starting compare tool with request: {@Request}", startRequest);
+            _logger.Debug("Starting external tool with request: {@Request}", startRequest);
 
             killProcesses("EXCEL");
             var exitCode = await startRequest.RunProcessAsync().ConfigureAwait(false);
 
-            _logger.Debug("Compare tool done with code: {ExitCode}", exitCode);
+            _logger.Debug("External tool done with code: {ExitCode}", exitCode);
 
             return exitCode;
         }

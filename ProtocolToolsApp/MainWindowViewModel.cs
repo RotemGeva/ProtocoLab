@@ -13,8 +13,6 @@ using System.Reflection;
 using System.Collections.Specialized;
 using ICSharpCode.SharpZipLib.Tar;
 using System.Text.RegularExpressions;
-using DryIoc;
-using Prism.Dialogs;
 
 
 
@@ -532,13 +530,15 @@ class MainWindowViewModel : BindableBase
             { "items", matchingFolders }
         };
 
-        _dialogService.ShowDialog(nameof(SelectionDialog), parameters, result =>
+
+        _dialogService.ShowDialog(nameof(SelectionDialog), parameters, async result =>
         {
             if (result.Result == ButtonResult.OK)
             {
-                // Handle OK result
-                var selectedProtocol = result.Parameters.GetValue<string>("SelectedProtocol");
-                // Use the selected protocol as needed
+                var selectedProtocols = result.Parameters.GetValue<List<string>>("selectedItems");
+                MakeReqRequest request = new(DraftItem!.ActualPath!, selectedProtocols);
+                var exitCode = await _cliMgr.MakeReqAsync(request);
+
             }
             else if (result.Result == ButtonResult.Cancel)
             {

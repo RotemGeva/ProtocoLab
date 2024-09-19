@@ -58,10 +58,10 @@
             </DataTemplate>
           </DataGridTemplateColumn.CellTemplate>
         </DataGridTemplateColumn>
-        <DataGridTextColumn Header="MR Type" Binding="{Binding MrType}"/>
-        <DataGridTextColumn Header="Requirements" Binding="{Binding ReqPath}"/>
-        <DataGridTextColumn Header="File to Compare" Binding="{Binding ActualPath}"/>
-        <DataGridTextColumn Header="Execution Status" Binding="{Binding ExecutionStatus}"/>
+        <DataGridTextColumn Header="MR Type" Binding="{Binding MrType}" Width="Auto"/>
+        <DataGridTextColumn Header="Requirements" Binding="{Binding ReqPath}" Width="Auto"/>
+        <DataGridTextColumn Header="File to Compare" Binding="{Binding ActualPath}" Width="Auto"/>
+        <DataGridTextColumn Header="Execution Status" Binding="{Binding ExecutionStatus}" Width="Auto"/>
       </DataGrid.Columns>
     </DataGrid>
 
