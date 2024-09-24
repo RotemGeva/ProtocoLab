@@ -15,9 +15,7 @@ namespace ProtocoLab
                 {
                     _protocols.CollectionChanged += Protocols_CollectionChanged;
                     foreach (var item in _protocols)
-                    {
                         item.PropertyChanged += ProtocolItem_PropertyChanged;
-                    }
                 }
             }
         }
@@ -25,13 +23,17 @@ namespace ProtocoLab
         public DelegateCommand ConfirmCommand { get; private set; }
         public DelegateCommand CancelCommand { get; private set; }
 
+        public DelegateCommand SelectAllCommand { get; private set; }
+
         public SelectionDialogViewModel()
         {
             Title = "Protocols Selection";
             Protocols = new ObservableCollection<ProtocolItem>();
             ConfirmCommand = new DelegateCommand(ConfirmDialog, CanConfirmDialog);
             CancelCommand = new DelegateCommand(CancelDialog);
+            SelectAllCommand = new DelegateCommand(SelectAll);
         }
+
 
         public override void OnDialogOpened(IDialogParameters parameters)
         {
@@ -67,16 +69,12 @@ namespace ProtocoLab
             if (e.NewItems != null)
             {
                 foreach (ProtocolItem item in e.NewItems)
-                {
                     item.PropertyChanged += ProtocolItem_PropertyChanged;
-                }
             }
             if (e.OldItems != null)
             {
                 foreach (ProtocolItem item in e.OldItems)
-                {
                     item.PropertyChanged -= ProtocolItem_PropertyChanged;
-                }
             }
             ConfirmCommand.RaiseCanExecuteChanged();
         }
@@ -88,14 +86,20 @@ namespace ProtocoLab
                 ConfirmCommand.RaiseCanExecuteChanged();
             }
         }
+
+        private void SelectAll()
+        {
+            foreach(var item in  _protocols)
+                item.IsSelected = true;
+        }
     }
 
     public class ProtocolItem : BindableBase
     {
-        private string _name;
+        private string? _name;
         public string Name
         {
-            get => _name;
+            get => _name!;
             set => SetProperty(ref _name, value);
         }
 

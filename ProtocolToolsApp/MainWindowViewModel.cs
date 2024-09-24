@@ -13,8 +13,7 @@ using System.Reflection;
 using System.Collections.Specialized;
 using ICSharpCode.SharpZipLib.Tar;
 using System.Text.RegularExpressions;
-
-
+using System.Windows.Input;
 
 namespace ProtocoLab;
 
@@ -29,8 +28,9 @@ class MainWindowViewModel : BindableBase
 
     private CompareItem? _draftItem;
     private CompareItem? _selectedItem;
-    
+
     private bool _isComparing;
+    private bool _isMakingRequirements;
     private bool _hasItems;
     private bool _hasSelectedItems;
 
@@ -50,9 +50,6 @@ class MainWindowViewModel : BindableBase
 
     public DelegateCommand OpenFolderCommand { get; }
 
-    public AsyncDelegateCommand CompareAsyncCommand { get; }
-    public AsyncDelegateCommand CompareAllAsyncCommand { get; }
-
     public DelegateCommand DeleteItemCommand { get; }
 
     public DelegateCommand DeleteAllItemsCommand { get; }
@@ -67,7 +64,12 @@ class MainWindowViewModel : BindableBase
 
     public DelegateCommand OpenLatestLogCommand { get; }
 
-    public DelegateCommand MakeRequirementsCommand { get; }
+
+    public DelegateCommand OpenRequirementsCommand { get; }
+
+    public AsyncDelegateCommand CompareAsyncCommand { get; }
+    public AsyncDelegateCommand CompareAllAsyncCommand { get; }
+    public AsyncDelegateCommand MakeRequirementsAsyncCommand { get; }
 
 
     public MainWindowViewModel(IDialogService dialogService, CompareCliApi.CliMgr cliMgr)
@@ -113,12 +115,15 @@ class MainWindowViewModel : BindableBase
         OpenFileToCompareFromDialogCommand = new DelegateCommand(OpenFileToCompareFromDialog, CanOpenFileToCompareFromDialog);
 
         OpenProtocolExtractorCommand = new DelegateCommand(OpenProtocolExtractor, CanOpenProtocolExtractor);
-        
+
         UploadInputFileCommand = new DelegateCommand(UploadInputFile, CanUploadInputFile);
 
         OpenLatestLogCommand = new DelegateCommand(OpenLatestLog, CanOpenLatestLog);
 
-        MakeRequirementsCommand = new DelegateCommand(MakeRequirements, CanMakeRequirements).ObservesProperty(() => DraftItem.ActualPath);
+        MakeRequirementsAsyncCommand = new AsyncDelegateCommand(MakeRequirementsAsync, CanMakeRequirementsAsync).ObservesProperty(() => DraftItem.ActualPath)
+            .ObservesProperty(() => IsMakingRequirements);
+
+        OpenRequirementsCommand = new DelegateCommand(OpenRequirements, CanOpenRequirements);
 
         void compareItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -157,8 +162,6 @@ class MainWindowViewModel : BindableBase
         }
 
     }
-
-    
     public CompareItem? DraftItem
     {
         get => _draftItem;
@@ -175,7 +178,7 @@ class MainWindowViewModel : BindableBase
             if (value != _draftItem) //Checks if a new DraftItem object was created (=a row was selected).
             {
                 if (_draftItem != null)
-                    _draftItem.PropertyChanged -= onDraftItemPropertyChanged; 
+                    _draftItem.PropertyChanged -= onDraftItemPropertyChanged;
                 //If textboxes are full, activate event handler so it checks if an update or an adding is needed.
                 if (value != null)
                     value.PropertyChanged += onDraftItemPropertyChanged;
@@ -213,6 +216,11 @@ class MainWindowViewModel : BindableBase
     {
         get => _isComparing;
         set => SetProperty(ref _isComparing, value);
+    }
+    public bool IsMakingRequirements
+    {
+        get => _isMakingRequirements;
+        set => SetProperty(ref _isMakingRequirements, value);
     }
 
     private CompareRequest? CompareRequest => SelectedItem == null ?
@@ -324,7 +332,10 @@ class MainWindowViewModel : BindableBase
                     _logger.Error("Compare with parameters: {@Request} failed", request);
                 }
                 else
+                {
                     item.ExecutionStatus = "Succeeded";
+                    _logger.Information("Compare with parameters: {@Request} succeded", request);
+                }
             }
             catch (Exception ex)
             {
@@ -343,7 +354,7 @@ class MainWindowViewModel : BindableBase
 
     private bool CanOpenResult() =>
         CompareRequest != null && File.Exists(_cliMgr.GetResultsPath(CompareRequest)) && !IsComparing;
-    
+
 
     private void OpenResult()
     {
@@ -392,7 +403,7 @@ class MainWindowViewModel : BindableBase
 
         _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Are you sure you want to delete everything?"), dr =>
         {
-;           if (dr != null && dr.Result == ButtonResult.OK)
+            ; if (dr != null && dr.Result == ButtonResult.OK)
                 _compareItems.Clear();
         });
     }
@@ -461,7 +472,7 @@ class MainWindowViewModel : BindableBase
 
     private bool CanUploadInputFile() => true;
 
-   
+
     /// <summary>
     /// <param name="latestLog">The most updated log in app's directory</param>
     /// <param name="records">Contains a list of all values of input file</param>
@@ -515,36 +526,60 @@ class MainWindowViewModel : BindableBase
         }
     }
 
-    private bool CanMakeRequirements()
+    private bool CanMakeRequirementsAsync()
     {
-        return DraftItem!.ActualPath != null && File.Exists(DraftItem.ActualPath);
+        return DraftItem!.ActualPath != null && File.Exists(DraftItem.ActualPath) && !IsMakingRequirements;
     }
 
-    private void MakeRequirements()
+    private async Task MakeRequirementsAsync()
     {
-        string TarExtractFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "TarExtractFolder");
+        Process[] pname = Process.GetProcessesByName("EXCEL");
+        if (pname.Length != 0)//excel is open
+        {
+            IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
+            "Did you save all your work?"));
+
+            if (dr != null && dr.Result == ButtonResult.OK)
+            {
+                await HandleMakeRequirementsAsync();
+            }
+        }
+        else
+            await HandleMakeRequirementsAsync();
+    }
+
+    private async Task HandleMakeRequirementsAsync()
+    {
+        IsMakingRequirements = true;
+        string TarExtractFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "TempTarExtract");
         ExtractTar(DraftItem!.ActualPath!, TarExtractFolder);
-        List<string> matchingFolders = ExtractProtocolName(TarExtractFolder);
+        List<string> matchingProtocols = ExtractProtocolName(TarExtractFolder);
         var parameters = new DialogParameters
         {
-            { "items", matchingFolders }
+            { "items", matchingProtocols }
         };
 
 
-        _dialogService.ShowDialog(nameof(SelectionDialog), parameters, async result =>
-        {
-            if (result.Result == ButtonResult.OK)
-            {
-                var selectedProtocols = result.Parameters.GetValue<List<string>>("selectedItems");
-                MakeReqRequest request = new(DraftItem!.ActualPath!, selectedProtocols);
-                var exitCode = await _cliMgr.MakeReqAsync(request);
+        var result = await _dialogService.ShowDialogAsync(nameof(SelectionDialog), parameters);
 
-            }
-            else if (result.Result == ButtonResult.Cancel)
+        if (result.Result == ButtonResult.OK)
+        {
+            var selectedProtocols = result.Parameters.GetValue<List<string>>("selectedItems");
+            MakeReqRequest request = new(DraftItem!.ActualPath!, selectedProtocols);
+            var exitCode = await _cliMgr.MakeReqAsync(request, selectedProtocols);
+            if (exitCode != 0)
             {
-                // Handle Cancel result
+                _logger.Error("Make requirements with parameters: {@Request} failed", request);
+                await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Making requirements failed"));
             }
-        });
+            else
+            {
+                _logger.Information("Make requirements with parameters: {@Request} succeded", request);
+                await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Making requirements succeded!"));
+            }
+        }
+
+        IsMakingRequirements = false;
 
         /// <summary>
         /// Extracts the contents of a tar file to a specified directory.
@@ -629,6 +664,28 @@ class MainWindowViewModel : BindableBase
         }
     }
 
+
+    private bool CanOpenRequirements()
+    {
+        string requirementsFolderPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "Requirements"); 
+        return Directory.Exists(requirementsFolderPath);
+    }
+
+
+    private void OpenRequirements()
+    {
+        if (!CanOpenRequirements()) return;
+
+        string requirementsFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "Requirements");
+        var psi = new ProcessStartInfo()
+        {
+            FileName = requirementsFolder,
+            UseShellExecute = true
+        };
+        Process.Start(psi);
+    }
+
+
     private bool CanOpenLatestLog()
     {
         string logsPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "CompareLogs");
@@ -677,4 +734,5 @@ class MainWindowViewModel : BindableBase
         public string? ReqPath { get; set; }
         public string? ActualPath { get; set; }
     }
+
 }

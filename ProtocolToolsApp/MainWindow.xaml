@@ -18,7 +18,7 @@
     </Grid.RowDefinitions>
 
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="500*"></ColumnDefinition>
+      <ColumnDefinition Width="530*"></ColumnDefinition>
       <ColumnDefinition Width="527*"/>
       <ColumnDefinition Width="120"/>
     </Grid.ColumnDefinitions>
@@ -47,7 +47,7 @@
       <Button x:Name="AddFromFile" Content="Add from File" Width="100" Height="30" Margin="10" Command="{Binding OpenFileToCompareFromDialogCommand}"/>
       <Button x:Name="Add" Content="Add to List" Width="100" Height="30" Margin="10" Command="{Binding AddItemCommand}"/>
       <Button x:Name="Update" Content="Update" Width="100" Height="30" Margin="10" Command="{Binding UpdateSelectedItemCommand}"/>
-      <Button x:Name="MakeReq" Content="Make Req" Width="100" Height="30" Margin="10" Command="{Binding MakeRequirementsCommand}"/>
+      <Button x:Name="MakeReq" Content="Make Req" Width="100" Height="30" Margin="10" Command="{Binding MakeRequirementsAsyncCommand}"/>
     </StackPanel>
     <DataGrid Grid.Row="3" Name="dataGrid1" Margin="10,10,10,10" AutoGenerateColumns="False" ItemsSource="{Binding CompareItems}" SelectedItem="{Binding SelectedItem}" Grid.ColumnSpan="2">
       <DataGrid.Columns>
@@ -73,6 +73,7 @@
       <Button x:Name="OpenRes" Content="Open Result" Width="100" Height="30" Command="{Binding OpenResultCommand}"/>
       <Button x:Name="OpenFolder" Content="Open Folder" Width="100" Height="30" Command="{Binding OpenFolderCommand}"/>
       <Button x:Name="OpenLog" Content="Open Latest Log" Width="100" Height="30" Command="{Binding OpenLatestLogCommand}"/>
+      <Button x:Name="OpenRequirements" Content="Req Folder" Width="100" Height="30" Command="{Binding OpenRequirementsCommand}"/>
     </StackPanel>
   </Grid>
 </Window>

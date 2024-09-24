@@ -41,17 +41,18 @@ public static class CompareCliApi
             foreach (DirectoryInfo subDirectory in directory.GetDirectories()) subDirectory.Delete(true);
         }
 
-        public async Task<int> MakeReqAsync(MakeReqRequest request, CancellationToken ct = default)
+        public async Task<int> MakeReqAsync(MakeReqRequest request, List<string> protocols, CancellationToken ct = default)
         {
             void killProcesses(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
             var resultDir = Path.Combine(CompareDataDir, "Requirements");
             Directory.CreateDirectory(resultDir);
+            var a = protocols.ToArray();
             _logger.Debug("Making requirements. The request: {@Request}", request);
             ProcessStartInfo startInfo = new()
             {
                 FileName = CompareExePath,
                 WorkingDirectory = Path.GetDirectoryName(CompareExePath),
-                Arguments = $@"-t {"\"" + request.DataPath + "\""} -f r",
+                Arguments = $@"-t {"\"" + request.DataPath + "\""} -p {protocols.Aggregate((x,y)=>$"{x} {y}")} -f r",
                 // Added double quotes to allow arguments with spaces
                 CreateNoWindow = true
             };
@@ -94,7 +95,7 @@ public static class CompareCliApi
             {
                 FileName = CompareExePath,
                 WorkingDirectory = Path.GetDirectoryName(CompareExePath),
-                Arguments = $@"-r {"\"" + reqFilePath + "\""} -t {"\"" + request.ActualDataPath + "\""}",
+                Arguments = $@"-r {"\"" + reqFilePath + "\""} -t {"\"" + request.ActualDataPath + "\""} -f c",
                 // Added double quotes to allow arguments with spaces
                 CreateNoWindow = true
             };
