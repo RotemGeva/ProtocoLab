@@ -14,6 +14,8 @@ using System.Collections.Specialized;
 using ICSharpCode.SharpZipLib.Tar;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
+using System.Windows.Shapes;
+using Path = System.IO.Path;
 
 namespace ProtocoLab;
 
@@ -33,6 +35,7 @@ class MainWindowViewModel : BindableBase
     private bool _isMakingRequirements;
     private bool _hasItems;
     private bool _hasSelectedItems;
+    private bool _reqFolderExist;
 
     public ReadOnlyObservableCollection<CompareItem> CompareItems { get; }
 
@@ -57,8 +60,6 @@ class MainWindowViewModel : BindableBase
     public DelegateCommand OpenFileFromDialogReqCommand { get; }
 
     public DelegateCommand OpenFileToCompareFromDialogCommand { get; }
-
-    public DelegateCommand OpenProtocolExtractorCommand { get; }
 
     public DelegateCommand UploadInputFileCommand { get; }
 
@@ -113,8 +114,6 @@ class MainWindowViewModel : BindableBase
         OpenFileFromDialogReqCommand = new DelegateCommand(OpenFileFromDialogReq, CanOpenFileFromDialogReq);
 
         OpenFileToCompareFromDialogCommand = new DelegateCommand(OpenFileToCompareFromDialog, CanOpenFileToCompareFromDialog);
-
-        OpenProtocolExtractorCommand = new DelegateCommand(OpenProtocolExtractor, CanOpenProtocolExtractor);
 
         UploadInputFileCommand = new DelegateCommand(UploadInputFile, CanUploadInputFile);
 
@@ -222,6 +221,7 @@ class MainWindowViewModel : BindableBase
         get => _isMakingRequirements;
         set => SetProperty(ref _isMakingRequirements, value);
     }
+
 
     private CompareRequest? CompareRequest => SelectedItem == null ?
         null : new(SelectedItem.MrType!, SelectedItem.ReqPath!, SelectedItem.ActualPath!);
@@ -444,31 +444,7 @@ class MainWindowViewModel : BindableBase
             DraftItem!.ActualPath = dialog.FileName;
     }
 
-    private bool CanOpenProtocolExtractor() => true;
 
-    private void OpenProtocolExtractor()
-    {
-        string tempFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "temp");
-        try
-        {
-            if (Directory.Exists(tempFolder))
-            {
-                Directory.Delete(tempFolder, recursive: true);
-                _logger.Information("Deleted temp folder successfully.");
-            }
-            string exePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "ProtocolExtractor", "ProtocolExtractor.exe");
-            Process process = new();
-            process.StartInfo.FileName = exePath;
-            process.StartInfo.WorkingDirectory = Path.GetDirectoryName(exePath);
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.CreateNoWindow = false;
-            process.Start();
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(ex, "Failed to execute ProtocolExtractor.");
-        }
-    }
 
     private bool CanUploadInputFile() => true;
 
@@ -665,24 +641,27 @@ class MainWindowViewModel : BindableBase
     }
 
 
-    private bool CanOpenRequirements()
-    {
-        string requirementsFolderPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "Requirements"); 
-        return Directory.Exists(requirementsFolderPath);
-    }
+    private bool CanOpenRequirements() => 
+         true;
 
 
     private void OpenRequirements()
     {
         if (!CanOpenRequirements()) return;
 
-        string requirementsFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "Requirements");
-        var psi = new ProcessStartInfo()
+        string requirementsFolderPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "Requirements");
+        if (Directory.Exists(requirementsFolderPath))
         {
-            FileName = requirementsFolder,
-            UseShellExecute = true
-        };
-        Process.Start(psi);
+            var psi = new ProcessStartInfo()
+            {
+                FileName = requirementsFolderPath,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+        }
+        else
+        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Requirements folder does not exist yet"));
+
     }
 
 
