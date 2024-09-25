@@ -28,7 +28,7 @@ public partial class App : PrismApplication
 
         loggerConfiguration.WriteTo.File(
             path: "Logs/ProtocoLab.log",
-            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] ({SourceContext}) {Message:lj}{NewLine}{Exception}",
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] ({SourceContext}) {Message:lj}{NewLine}{Exception}",
             rollingInterval: RollingInterval.Day,
             rollOnFileSizeLimit: true,
             retainedFileCountLimit: 16, shared: true);

@@ -1,11 +1,13 @@
 ﻿using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 
 namespace ProtocoLab
 {
     internal class SelectionDialogViewModel : DialogViewModelBase
     {
         private ObservableCollection<ProtocolItem> _protocols;
+        private bool _hasSelectedItems;
         public ObservableCollection<ProtocolItem> Protocols
         {
             get => _protocols;
@@ -19,6 +21,11 @@ namespace ProtocoLab
                 }
             }
         }
+        public bool HasSelectedItems
+        {
+            get => _hasSelectedItems;
+            set => SetProperty(ref _hasSelectedItems, value);
+        }
 
         public DelegateCommand ConfirmCommand { get; private set; }
         public DelegateCommand CancelCommand { get; private set; }
@@ -28,7 +35,8 @@ namespace ProtocoLab
         public SelectionDialogViewModel()
         {
             Title = "Protocols Selection";
-            Protocols = new ObservableCollection<ProtocolItem>();
+            _protocols = new ObservableCollection<ProtocolItem>();
+            Protocols = _protocols;
             ConfirmCommand = new DelegateCommand(ConfirmDialog, CanConfirmDialog);
             CancelCommand = new DelegateCommand(CancelDialog);
             SelectAllCommand = new DelegateCommand(SelectAll);
@@ -56,7 +64,7 @@ namespace ProtocoLab
 
         private bool CanConfirmDialog()
         {
-            return Protocols.Any(p => p.IsSelected);
+            return HasSelectedItems;
         }
 
         private void CancelDialog()
@@ -64,26 +72,36 @@ namespace ProtocoLab
             RaiseRequestClose(new DialogResult(ButtonResult.Cancel));
         }
 
-        private void Protocols_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        private void Protocols_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            if (e.NewItems != null)
+            switch (e.Action)
             {
-                foreach (ProtocolItem item in e.NewItems)
-                    item.PropertyChanged += ProtocolItem_PropertyChanged;
-            }
-            if (e.OldItems != null)
-            {
-                foreach (ProtocolItem item in e.OldItems)
-                    item.PropertyChanged -= ProtocolItem_PropertyChanged;
+                case NotifyCollectionChangedAction.Add:
+                    foreach (ProtocolItem item in e.NewItems!)
+                        item.PropertyChanged += ProtocolItem_PropertyChanged;
+                    break;
+                case NotifyCollectionChangedAction.Remove:
+                    HasSelectedItems = Protocols.Any(p => p.IsSelected);
+                    foreach (ProtocolItem item in e.OldItems!)
+                        item.PropertyChanged -= ProtocolItem_PropertyChanged;
+                    break;
+                case NotifyCollectionChangedAction.Replace:
+                case NotifyCollectionChangedAction.Move:
+                case NotifyCollectionChangedAction.Reset:
+                default:
+                    break;
             }
             ConfirmCommand.RaiseCanExecuteChanged();
         }
 
-        private void ProtocolItem_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void ProtocolItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(ProtocolItem.IsSelected))
+            switch (e.PropertyName)
             {
-                ConfirmCommand.RaiseCanExecuteChanged();
+                case nameof(ProtocolItem.IsSelected):
+                    HasSelectedItems = Protocols.Any(p => p.IsSelected);
+                    ConfirmCommand.RaiseCanExecuteChanged();
+                    break;
             }
         }
 

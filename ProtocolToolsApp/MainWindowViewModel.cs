@@ -16,6 +16,8 @@ using System.Text.RegularExpressions;
 using System.Windows.Input;
 using System.Windows.Shapes;
 using Path = System.IO.Path;
+using System;
+using Prism.Dialogs;
 
 namespace ProtocoLab;
 
@@ -272,14 +274,23 @@ class MainWindowViewModel : BindableBase
         Process[] pname = Process.GetProcessesByName("EXCEL");
         if (pname.Length != 0)//excel is open
         {
+            _logger.Information("Excel proccess is running in background. Presenting YesNoDialog...");
             IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
             "Did you save all your work?"));
 
             if (dr != null && dr.Result == ButtonResult.OK)
+            {
+                _logger.Information("User approved to force close Excel.");
                 await HandleCompareAsync();
+            }
+            else
+                _logger.Information("User aborted force close Excel dialog.");
         }
         else
+        {
+            _logger.Information("Excel process is not running in the background.");
             await HandleCompareAsync();
+        }
     }
     private async Task HandleCompareAsync()
     {
@@ -291,32 +302,40 @@ class MainWindowViewModel : BindableBase
 
     private async Task CompareAllAsync()
     {
+        _logger.Information("Compare All clicked...");
         Process[] pname = Process.GetProcessesByName("EXCEL");
         if (pname.Length != 0)//excel is open
         {
+            _logger.Information("Excel proccess is running in background. Presenting YesNoDialog...");
             IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
             "Did you save all your work?"));
 
             if (dr != null && dr.Result == ButtonResult.OK)
             {
+                _logger.Information("User approved to force close Excel.");
                 await HandleCompareAllAsync();
             }
+            else
+                _logger.Information("User aborted force close Excel dialog.");
         }
         else
+        {
+            _logger.Information("Excel process is not running in the background.");
             await HandleCompareAllAsync();
+        }
     }
 
     private async Task HandleCompareAllAsync(bool selectedOnly = false)
     {
+        _logger.Information($"Starting to compare all with selectedOnly mode: {selectedOnly}");
         IsComparing = true;
-
         _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing..."));
-
         var itemsToCompare = selectedOnly ? _compareItems.Where(x => x.IsSelected) : _compareItems;
-
         foreach (CompareItem item in itemsToCompare) // Restarting execution status
+        {
+            _logger.Information($"Restarting execution statues for: {item}.");
             item.ExecutionStatus = "";
-
+        }
         bool isSuccess = true;
         foreach (CompareItem item in itemsToCompare)
         {
@@ -358,9 +377,9 @@ class MainWindowViewModel : BindableBase
 
     private void OpenResult()
     {
-        if (!CanOpenResult()) return;
-
+        if (!CanOpenResult()) return;       
         Process process = new();
+        _logger.Information($"Opening results of: {Path.GetDirectoryName(process.StartInfo.FileName)}...");
         process.StartInfo.FileName = _cliMgr.GetResultsPath(CompareRequest!);
         process.StartInfo.WorkingDirectory = Path.GetDirectoryName(process.StartInfo.FileName);
         process.StartInfo.UseShellExecute = true;
@@ -376,6 +395,7 @@ class MainWindowViewModel : BindableBase
     {
         if (!CanOpenFolder()) return;
 
+        _logger.Information($"Opening results folder: {_cliMgr.GetFolderPath(CompareRequest!)}...");
         var psi = new ProcessStartInfo()
         {
             FileName = _cliMgr.GetFolderPath(CompareRequest!),
@@ -391,6 +411,7 @@ class MainWindowViewModel : BindableBase
     {
         if (!CanDeleteItem()) return;
 
+        _logger.Information($"Removing {SelectedItem} from data grid...");
         _compareItems.Remove(SelectedItem!);
     }
 
@@ -401,10 +422,14 @@ class MainWindowViewModel : BindableBase
     {
         if (!CanDeleteAllItems()) return;
 
+        _logger.Information("User requested to delete all items in data grid. Presenting YesNoDialog...");
         _dialogService.ShowDialog("YesNoDialog", new DialogParameters("message=Are you sure you want to delete everything?"), dr =>
         {
             ; if (dr != null && dr.Result == ButtonResult.OK)
+            {
+                _logger.Information("User clicked yes to delete all items in data grid. Clearing data grid...");
                 _compareItems.Clear();
+            }
         });
     }
 
@@ -420,11 +445,15 @@ class MainWindowViewModel : BindableBase
         {
             FileName = "Excel File",
             DefaultExt = ".xlsx",
-            Filter = "Excel files (.xlsx)|*.xlsx|All files (*.*)|*.*"
+            Filter = "Excel files (.xlsx)|*.xlsx|All files (*.*)|*.*",
+            InitialDirectory = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data")
         };
         bool? result = dialog.ShowDialog();
         if (result == true)
+        {
+            _logger.Information($"User loaded {dialog.FileName}.");
             DraftItem!.ReqPath = dialog.FileName;
+        }
     }
 
     private bool CanOpenFileToCompareFromDialog() => true;
@@ -441,7 +470,10 @@ class MainWindowViewModel : BindableBase
         };
         bool? result = dialog.ShowDialog();
         if (result == true)
+        {
+            _logger.Information($"User loaded {dialog.FileName}.");
             DraftItem!.ActualPath = dialog.FileName;
+        }
     }
 
 
@@ -467,11 +499,12 @@ class MainWindowViewModel : BindableBase
         bool? result = dialog.ShowDialog();
         if (result == true)
         {
+            _logger.Information($"User uploaded external file. Reading file content...");
             try
             {
                 using (Stream stream = new FileStream(dialog.FileName, FileMode.Open)) // try to open input file.
                 {
-                    stream.Dispose(); // succeded to open input file = input file is closed; closing input file.
+                    stream.Dispose(); // succeded to open input file = input file is not in use; closing input file.
                     var config = CsvConfiguration.FromAttributes<InputFile>();
                     using StreamReader reader = new(dialog.FileName);
                     using var csv = new CsvReader(reader, config);
@@ -509,6 +542,7 @@ class MainWindowViewModel : BindableBase
 
     private async Task MakeRequirementsAsync()
     {
+        _logger.Information("User requested to make requirements.");
         Process[] pname = Process.GetProcessesByName("EXCEL");
         if (pname.Length != 0)//excel is open
         {
@@ -564,6 +598,7 @@ class MainWindowViewModel : BindableBase
         /// <param name="destinationFolder">The directory to extract the tar file into.</param>
         void ExtractTar(string tarFilePath, string destinationFolder)
         {
+            _logger.Information($"Extracting protocols from tar: {destinationFolder}...");
             if (Directory.Exists(destinationFolder))
                 Directory.Delete(destinationFolder, true);
             Directory.CreateDirectory(destinationFolder);
@@ -610,6 +645,7 @@ class MainWindowViewModel : BindableBase
         /// <param name="directoryPath">The path of the directory that contains the protocols.</param>
         List<string> ExtractProtocolName(string directoryPath)
         {
+            _logger.Information($"Extracting protocols names from {directoryPath}.");
             // Regex pattern to match folder names
             var pattern = @"^adult_other_(.+?)_\d+_\d+$";
             var regex = new Regex(pattern, RegexOptions.Compiled);
@@ -629,6 +665,7 @@ class MainWindowViewModel : BindableBase
 
                 if (match.Success)
                 {
+                    _logger.Information($"{folderPath} contained regex pattern.");
                     // Extract the captured group
                     var extractedName = match.Groups[1].Value;
 
@@ -636,13 +673,19 @@ class MainWindowViewModel : BindableBase
                     matchingFolders.Add(extractedName);
                 }
             }
+            _logger.Information($"The matching folders are: {matchingFolders.Aggregate((x, y) => $"{x} {y}")}.");
             return matchingFolders;
         }
     }
 
 
-    private bool CanOpenRequirements() => 
-         true;
+    private bool CanOpenRequirements()
+    {
+        string requirementsFolderPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "Requirements");
+        if (Directory.Exists(requirementsFolderPath))
+            return true;
+        return false;
+    }
 
 
     private void OpenRequirements()
@@ -659,18 +702,15 @@ class MainWindowViewModel : BindableBase
             };
             Process.Start(psi);
         }
-        else
-        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Requirements folder does not exist yet"));
-
     }
 
 
     private bool CanOpenLatestLog()
     {
-        string logsPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "CompareLogs");
-        if (Directory.Exists(logsPath))
+        string logsFolderPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "ExternalToolLogs");
+        if (Directory.Exists(logsFolderPath))
         {
-            if (!Directory.EnumerateFileSystemEntries(logsPath).Any()) // Check if CompareLogs is empty.
+            if (!Directory.EnumerateFileSystemEntries(logsFolderPath).Any()) // Checks if logs folder is empty.
                 return false;
             else return true;
         }
@@ -679,15 +719,21 @@ class MainWindowViewModel : BindableBase
 
     private void OpenLatestLog()
     {
-        var logsFolder = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "CompareLogs"));
+        var logsFolder = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "ExternalToolLogs"));
         var latestLog = (from f in logsFolder.GetFiles("*.log") orderby f.LastWriteTime descending select f).First();
+        _logger.Information($"Latest log file that was found in folder: {logsFolder} is: {latestLog}. Opening file in notepad.exe...");
         Process.Start("notepad.exe", latestLog.FullName);
     }
 
 
-    // Checks if CSV input file contains valid values. If not, writes to log the invalid value and line number.
+    /// <summary>
+    ///  Checks if CSV input file contains valid values. If not, writes to log the invalid value and line number.
+    /// </summary>
+    /// <param name="records">Lines of CSV file.</param>
+    /// <returns></returns>
     private bool IsInputFileValid(List<InputFile> records)
     {
+        _logger.Information("Verifying input file is valid...");
         bool isValid = true;
         foreach ((InputFile record, int index) in records.Select((record, index) => (record, index)))
         {
@@ -702,6 +748,7 @@ class MainWindowViewModel : BindableBase
                 _logger.Error("Actual file path: {ActualPath} is invalid [line: {Index}].", record.ActualPath, index + 1);
             }
         }
+        _logger.Information($"Input file validation mode: {isValid}.");
         return isValid;
     }
 

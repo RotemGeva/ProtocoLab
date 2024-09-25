@@ -21,26 +21,42 @@ public static class CompareCliApi
         private string CompareDir => Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli");
         private string CompareDataDir => Path.Combine(CompareDir, "Data");
 
-        private string CompareExePath => Path.Combine(CompareDir, "Compare.exe");
+        private string CompareExePath => Path.Combine(CompareDir, "ExternalTool.exe");
 
+        /// <summary>
+        /// Preserving previous comparison results in target folder.
+        /// </summary>
+        /// <param name="directory">Target directory to preseve its results.</param>
         private static void EmptyFolderExceptResults(DirectoryInfo directory)
         {
+            _logger.Information($"Preparing target directory: {directory}.");
             DateTime timestamp = DateTime.Now;
             string formattedTimestamp = timestamp.ToString("ddMMyy_HHmmss");
             foreach (FileInfo file in directory.GetFiles())
             {
-                if (file.Name.EndsWith("_Comparison.xlsx"))
+                if (file.Name.EndsWith("_Comparison.xlsx")) //Keeping previous results in folder.
                 {
+                    _logger.Information($"Adding timstamp to file: {file}...");
                     string newFileName = file.Name.Replace("Comparison.xlsx", "Comparison_" + formattedTimestamp + ".xlsx");
                     string newFilePath = Path.Combine(file.DirectoryName!, newFileName);
                     File.Move(file.FullName, newFilePath);
                 }
                 else if (!file.Name.Contains("_Comparison") && !file.Name.EndsWith("_Comparison"))
+                {
+                    _logger.Information($"{file} is not previous comparison results. Deleting file...");
                     file.Delete();
+                }                    
             }
             foreach (DirectoryInfo subDirectory in directory.GetDirectories()) subDirectory.Delete(true);
         }
 
+        /// <summary>
+        /// Handeling making requirements requests with external tool.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="protocols">Protocols to preserve in requirements file.</param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
         public async Task<int> MakeReqAsync(MakeReqRequest request, List<string> protocols, CancellationToken ct = default)
         {
             void killProcesses(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
@@ -72,18 +88,27 @@ public static class CompareCliApi
             return exitCode;
         }
 
+        /// <summary>
+        /// Handleing comapre requests with external tool.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
         public async Task<int> CompareAsync(CompareRequest request, CancellationToken ct = default)
         {
             void killProcesses(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
 
-            _logger.Debug("Comparing. The request: {@Request}", request);
+            _logger.Debug("Comparing... The request: {@Request}", request);
 
             var resultDir = Path.Combine(CompareDataDir, request.MrType);
 
             if (Directory.Exists(resultDir))
                 EmptyFolderExceptResults(new DirectoryInfo(resultDir));
             else
+            {
+                _logger.Information($"{resultDir} does not exist. Creating new folder...");
                 Directory.CreateDirectory(resultDir);
+            }
 
             var reqFileName = $"{request.MrType}_Requirements.xlsx";
             //reqFileName = Path.ChangeExtension(reqFileName, Path.GetExtension(request.RequirementsPath)); - didn't work for path with '.'

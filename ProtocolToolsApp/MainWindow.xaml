@@ -28,7 +28,7 @@
         <TextBlock Text="Enter MRI name (e.g MR30_Premier)"/>
         <TextBox Grid.Row="0" x:Name="MrName" Width="300" HorizontalAlignment="Left" Text="{Binding DraftItem.MrType}"/>
       </StackPanel>
-      <Button Grid.Row="0" Grid.Column="1" Width="100" Height="30" Content="Upload Input File" Margin="7" Command="{Binding UploadInputFileCommand}"/>
+      <Button Grid.Row="0" Grid.Column="1" Width="100" Height="30" Content="Upload Input File" Margin="10" Command="{Binding UploadInputFileCommand}"/>
     </StackPanel>
 
 

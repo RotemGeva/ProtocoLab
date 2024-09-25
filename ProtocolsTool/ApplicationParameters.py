@@ -9,5 +9,6 @@ class ApplicationParameters:
         self.mr_name = mr_name
         self.protocols = protocols
 
-# D:\\TarTool\\Premier\\Auto\\protocol.tar
-# C:\\Users\\RotemG\\PycharmProjects\\ProtocolsTool\\Data\\MR30_Premier\\MR30_Premier_Requirements.xlsx
+    def __str__(self):
+        return (f'Macro file path: {self.macro_excel_file}, requirements file: {self.path_for_req}, tar file path: {self.path_for_tar}'
+                f', MR name: {self.mr_name}, selected protocols: {self.protocols}')
