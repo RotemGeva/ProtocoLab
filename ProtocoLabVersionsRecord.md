@@ -14,4 +14,4 @@
 		Added Open Latest Log - allows the user to open latest compare log.
 		Added ability to make requirements from a given tar file.
 		Enriched log file of both GUI and external tool.
-		
+		Concatenate logs of runs that occured in less than 2 minutes one after another.
