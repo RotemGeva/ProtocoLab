@@ -552,10 +552,14 @@ class MainWindowViewModel : BindableBase
             if (dr != null && dr.Result == ButtonResult.OK)
             {
                 await HandleMakeRequirementsAsync();
+                OpenRequirementsCommand.RaiseCanExecuteChanged();
             }
         }
         else
+        {
             await HandleMakeRequirementsAsync();
+            OpenRequirementsCommand.RaiseCanExecuteChanged();
+        }
     }
 
     private async Task HandleMakeRequirementsAsync()
