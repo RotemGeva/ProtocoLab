@@ -114,22 +114,17 @@ class MainWindowViewModel : BindableBase
             .ObservesProperty(() => IsComparing);
 
         CompareAllAsyncCommand = new AsyncDelegateCommand(CompareAllAsync, CanCompareAllAsync).ObservesProperty(() => HasItems).ObservesProperty(() => IsComparing);
+        MakeRequirementsAsyncCommand = new AsyncDelegateCommand(MakeRequirementsAsync, CanMakeRequirementsAsync).ObservesProperty(() => DraftItem.ActualPath)
+        .ObservesProperty(() => IsMakingRequirements);
 
         OpenFileFromDialogReqCommand = new DelegateCommand(OpenFileFromDialogReq, CanOpenFileFromDialogReq);
-
         OpenFileToCompareFromDialogCommand = new DelegateCommand(OpenFileToCompareFromDialog, CanOpenFileToCompareFromDialog);
-
         UploadInputFileCommand = new DelegateCommand(UploadInputFile, CanUploadInputFile);
-
         OpenLatestLogCommand = new DelegateCommand(OpenLatestLog, CanOpenLatestLog);
-
-        MakeRequirementsAsyncCommand = new AsyncDelegateCommand(MakeRequirementsAsync, CanMakeRequirementsAsync).ObservesProperty(() => DraftItem.ActualPath)
-            .ObservesProperty(() => IsMakingRequirements);
-
         OpenRequirementsCommand = new DelegateCommand(OpenRequirements, CanOpenRequirements);
 
-        SelectAllCommand = new DelegateCommand(SelectAll, CanSelectAll).ObservesProperty(() => HasItems);
-        UnselectAllCommand = new DelegateCommand(UnselectAll, CanUnselectAll).ObservesProperty(() => HasSelectedItems);
+        SelectAllCommand = new DelegateCommand(SelectAll, CanSelectAll).ObservesProperty(() => HasItems).ObservesProperty(() => IsComparing);
+        UnselectAllCommand = new DelegateCommand(UnselectAll, CanUnselectAll).ObservesProperty(() => HasSelectedItems).ObservesProperty(() => IsComparing);
 
         void compareItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -717,7 +712,7 @@ class MainWindowViewModel : BindableBase
         }
     }
 
-    private bool CanSelectAll() => HasItems;
+    private bool CanSelectAll() => HasItems && !IsComparing;
 
     private void SelectAll()
     {
@@ -728,7 +723,7 @@ class MainWindowViewModel : BindableBase
         HasSelectedItems = true;
     }
 
-    private bool CanUnselectAll() => HasSelectedItems;
+    private bool CanUnselectAll() => HasSelectedItems && !IsComparing;
 
     private void UnselectAll()
     {
