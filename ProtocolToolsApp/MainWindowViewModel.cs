@@ -69,6 +69,8 @@ class MainWindowViewModel : BindableBase
 
 
     public DelegateCommand OpenRequirementsCommand { get; }
+    public DelegateCommand SelectAllCommand { get; }
+    public DelegateCommand UnselectAllCommand { get; }
 
     public AsyncDelegateCommand CompareAsyncCommand { get; }
     public AsyncDelegateCommand CompareAllAsyncCommand { get; }
@@ -126,6 +128,9 @@ class MainWindowViewModel : BindableBase
 
         OpenRequirementsCommand = new DelegateCommand(OpenRequirements, CanOpenRequirements);
 
+        SelectAllCommand = new DelegateCommand(SelectAll, CanSelectAll).ObservesProperty(() => HasItems);
+        UnselectAllCommand = new DelegateCommand(UnselectAll, CanUnselectAll).ObservesProperty(() => HasSelectedItems);
+
         void compareItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             switch (e.Action)
@@ -163,6 +168,9 @@ class MainWindowViewModel : BindableBase
         }
 
     }
+
+
+
     public CompareItem? DraftItem
     {
         get => _draftItem;
@@ -368,6 +376,7 @@ class MainWindowViewModel : BindableBase
         else
             _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Comparison process terminated with errors. Check log"));
         IsComparing = false;
+        OpenLatestLogCommand.RaiseCanExecuteChanged();
     }
 
 
@@ -708,6 +717,28 @@ class MainWindowViewModel : BindableBase
         }
     }
 
+    private bool CanSelectAll() => HasItems;
+
+    private void SelectAll()
+    {
+        if (!CanSelectAll()) return;
+
+        foreach (var item in _compareItems)
+            item.IsSelected = true; 
+        HasSelectedItems = true;
+    }
+
+    private bool CanUnselectAll() => HasSelectedItems;
+
+    private void UnselectAll()
+    {
+        if (!CanUnselectAll()) return;
+
+        foreach (var item in _compareItems)
+            item.IsSelected = false;
+        HasSelectedItems = false;
+    }
+
 
     private bool CanOpenLatestLog()
     {
@@ -723,6 +754,7 @@ class MainWindowViewModel : BindableBase
 
     private void OpenLatestLog()
     {
+        if (!CanOpenLatestLog()) return;
         var logsFolder = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "ExternalToolLogs"));
         var latestLog = (from f in logsFolder.GetFiles("*.log") orderby f.LastWriteTime descending select f).First();
         _logger.Information($"Latest log file that was found in folder: {logsFolder} is: {latestLog}. Opening file in notepad.exe...");

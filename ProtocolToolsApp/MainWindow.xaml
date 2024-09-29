@@ -74,6 +74,8 @@
       <Button x:Name="OpenFolder" Content="Open Folder" Width="100" Height="30" Command="{Binding OpenFolderCommand}"/>
       <Button x:Name="OpenLog" Content="Open Latest Log" Width="100" Height="30" Command="{Binding OpenLatestLogCommand}"/>
       <Button x:Name="OpenRequirements" Content="Req Folder" Width="100" Height="30" Command="{Binding OpenRequirementsCommand}"/>
+      <Button x:Name="SelectAll" Content="Select All" Width="100" Height="30" Command="{Binding SelectAllCommand}"/>
+      <Button x:Name="UnselectAll" Content="Unselect All" Width="100" Height="30" Command="{Binding UnselectAllCommand}"/>
     </StackPanel>
   </Grid>
 </Window>
