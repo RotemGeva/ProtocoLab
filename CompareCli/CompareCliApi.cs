@@ -141,9 +141,11 @@ public static class CompareCliApi
         }
 
         public string GetResultsPath(CompareRequest request) =>
-            Path.ChangeExtension(
+                Path.Combine(CompareDataDir, request.MrType, $"{request.MrType}_Comparison.xlsx");
+
+        /*Path.ChangeExtension(
                 Path.Combine(CompareDataDir, request.MrType, $"{request.MrType}_Comparison"),
-                Path.GetExtension(request.RequirementsPath));
+                Path.GetExtension(request.RequirementsPath));*/
 
         public string GetFolderPath(CompareRequest request) =>
                 Path.Combine(CompareDataDir, request.MrType);
