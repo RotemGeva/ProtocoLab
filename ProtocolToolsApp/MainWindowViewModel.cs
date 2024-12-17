@@ -34,6 +34,7 @@ class MainWindowViewModel : BindableBase
     private bool _hasItems;
     private bool _hasSelectedItems;
     private bool _reqFolderExist;
+    private bool _isComparisonInterrupted;
 
     public ReadOnlyObservableCollection<CompareItem> CompareItems { get; }
 
@@ -69,6 +70,8 @@ class MainWindowViewModel : BindableBase
 
     public DelegateCommand OpenLatestLogCommand { get; }
     public DelegateCommand OpenLogCommand { get; }
+    public DelegateCommand InterruptComparisonCommand { get; }
+
 
 
     /// <summary>
@@ -136,6 +139,8 @@ class MainWindowViewModel : BindableBase
         SelectAllCommand = new DelegateCommand(SelectAll, CanSelectAll).ObservesProperty(() => HasItems).ObservesProperty(() => IsComparing);
         UnselectAllCommand = new DelegateCommand(UnselectAll, CanUnselectAll).ObservesProperty(() => HasSelectedItems).ObservesProperty(() => IsComparing);
 
+        InterruptComparisonCommand = new DelegateCommand(InterruptComparison, CanInterruptComparison).ObservesProperty(() => IsComparing);
+
         void compareItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             switch (e.Action)
@@ -173,8 +178,6 @@ class MainWindowViewModel : BindableBase
         }
 
     }
-
-
 
     public CompareItem? DraftItem
     {
@@ -235,6 +238,12 @@ class MainWindowViewModel : BindableBase
     {
         get => _isMakingRequirements;
         set => SetProperty(ref _isMakingRequirements, value);
+    }
+
+    public bool IsComparisonInterrupted
+    {
+        get => _isComparisonInterrupted;
+        set => SetProperty(ref _isComparisonInterrupted, value);
     }
 
 
@@ -352,36 +361,55 @@ class MainWindowViewModel : BindableBase
         bool isSuccess = true;
         foreach (CompareItem item in itemsToCompare)
         {
-            CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
-            try
-            {
-                item.ExecutionStatus = "Running...";
-                var exitCode = await _cliMgr.CompareAsync(request);
-                if (exitCode != 0)
+            if (!IsComparisonInterrupted) {
+                CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
+                try
                 {
-                    isSuccess = false;
-                    item.ExecutionStatus = "Failed";
-                    _logger.Error("Compare with parameters: {@Request} failed", request);
+                    item.ExecutionStatus = "Running...";
+                    var exitCode = await _cliMgr.CompareAsync(request);
+                    if (exitCode != 0)
+                    {
+                        isSuccess = false;
+                        item.ExecutionStatus = "Failed";
+                        _logger.Error("Compare with parameters: {@Request} failed", request);
+                    }
+                    else
+                    {
+                        item.ExecutionStatus = "Succeeded";
+                        _logger.Information("Compare with parameters: {@Request} succeded", request);
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    item.ExecutionStatus = "Succeeded";
-                    _logger.Information("Compare with parameters: {@Request} succeded", request);
+                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
+                    item.ExecutionStatus = "Failed";
+                    _logger.Error(ex, "Compare tool failed to execute");
                 }
             }
-            catch (Exception ex)
+
+            else
             {
-                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
-                item.ExecutionStatus = "Failed";
-                _logger.Error(ex, "Compare tool failed to execute");
+                _logger.Information("The comparison process was interrupted.");
+                IsComparing = false;
+                return;
             }
         }
         if (isSuccess)
             _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=All terminated successfully!"));
         else
-            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Comparison process terminated with errors. Check log"));
+            _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process terminated with errors. Check log"));
         IsComparing = false;
         OpenLatestLogCommand.RaiseCanExecuteChanged();
+    }
+
+    private bool CanInterruptComparison() => IsComparing;
+
+    private void InterruptComparison()
+    {
+        if (!CanInterruptComparison()) return;
+        IsComparisonInterrupted = true;
+        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process was interrupted and " +
+            "will end after the current run."));
     }
 
 

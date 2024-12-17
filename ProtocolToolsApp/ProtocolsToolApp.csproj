@@ -6,14 +6,28 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
-		<ApplicationIcon>mri.ico</ApplicationIcon>
-		<AssemblyVersion>1.0.3.0</AssemblyVersion>
+		<ApplicationIcon>icon.ico</ApplicationIcon>
+		<AssemblyVersion>1.0.5.0</AssemblyVersion>
 		<AssemblyName>ProtocoLab</AssemblyName>
 		<Copyright>Insightec 2024</Copyright>
+		<PackageIcon>icon.ico</PackageIcon>
+		<FileVersion>1.0.5.0</FileVersion>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Content Include="mri.ico" />
+	  <Content Include="icon.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="..\icon.ico">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	  <None Include="..\README.md">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
 	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="CsvHelper" Version="33.0.1" />
@@ -26,6 +40,12 @@
 	</ItemGroup>
 	<ItemGroup>
 	  <ProjectReference Include="..\CompareCli\CompareCli.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+	  <None Update="icon.ico">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
 	</ItemGroup>
 
 </Project>
