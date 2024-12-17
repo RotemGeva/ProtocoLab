@@ -13,11 +13,7 @@ using System.Reflection;
 using System.Collections.Specialized;
 using ICSharpCode.SharpZipLib.Tar;
 using System.Text.RegularExpressions;
-using System.Windows.Input;
-using System.Windows.Shapes;
 using Path = System.IO.Path;
-using System;
-using Prism.Dialogs;
 
 namespace ProtocoLab;
 
@@ -51,8 +47,14 @@ class MainWindowViewModel : BindableBase
     /// </summary>
     public DelegateCommand AddItemCommand { get; }
 
+    /// <summary>
+    /// Open Excel comparison results.
+    /// </summary>
     public DelegateCommand OpenResultCommand { get; }
 
+    /// <summary>
+    /// Open folder that contains all of the comparison results.
+    /// </summary>
     public DelegateCommand OpenFolderCommand { get; }
 
     public DelegateCommand DeleteItemCommand { get; }
@@ -66,8 +68,12 @@ class MainWindowViewModel : BindableBase
     public DelegateCommand UploadInputFileCommand { get; }
 
     public DelegateCommand OpenLatestLogCommand { get; }
+    public DelegateCommand OpenLogCommand { get; }
 
 
+    /// <summary>
+    /// Open the folder the conatins all the created requirements.
+    /// </summary>
     public DelegateCommand OpenRequirementsCommand { get; }
     public DelegateCommand SelectAllCommand { get; }
     public DelegateCommand UnselectAllCommand { get; }
@@ -119,8 +125,12 @@ class MainWindowViewModel : BindableBase
 
         OpenFileFromDialogReqCommand = new DelegateCommand(OpenFileFromDialogReq, CanOpenFileFromDialogReq);
         OpenFileToCompareFromDialogCommand = new DelegateCommand(OpenFileToCompareFromDialog, CanOpenFileToCompareFromDialog);
+
         UploadInputFileCommand = new DelegateCommand(UploadInputFile, CanUploadInputFile);
+
         OpenLatestLogCommand = new DelegateCommand(OpenLatestLog, CanOpenLatestLog);
+        OpenLogCommand = new DelegateCommand(OpenLog, CanOpenLog).ObservesProperty(() => SelectedItem);
+
         OpenRequirementsCommand = new DelegateCommand(OpenRequirements, CanOpenRequirements);
 
         SelectAllCommand = new DelegateCommand(SelectAll, CanSelectAll).ObservesProperty(() => HasItems).ObservesProperty(() => IsComparing);
@@ -732,6 +742,31 @@ class MainWindowViewModel : BindableBase
         foreach (var item in _compareItems)
             item.IsSelected = false;
         HasSelectedItems = false;
+    }
+
+    private bool CanOpenLog()
+    {
+        if (CompareRequest == null) return false;
+        else
+        {
+            string logsFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "ExternalToolLogs");
+            string prefix = $"Compare-{CompareRequest.MrType}";
+            string[] logs = Directory.GetFiles(logsFolder, prefix + "*");
+            _logger.Information($"Found {logs.Length} matching logs that start with: {prefix}.");
+            return !IsComparing && Directory.Exists(logsFolder) && logs.Length > 0;
+        }
+    } 
+
+    
+    private void OpenLog()
+    {
+        if (!CanOpenLog()) return;
+        string logsFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "ExternalToolLogs");
+        string prefix = $"Compare-{CompareRequest!.MrType}";
+        string[] logs = Directory.GetFiles(logsFolder, prefix + "*");
+        var sortedLogs = logs.OrderByDescending(file => File.GetCreationTime(file)).ToArray();
+        _logger.Information($"The latest log that contains the prefix: {prefix} is: {sortedLogs[sortedLogs.Length-1]}.");
+        Process.Start("notepad.exe", sortedLogs[sortedLogs.Length - 1]);
     }
 
 
