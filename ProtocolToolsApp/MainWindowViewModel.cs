@@ -778,6 +778,7 @@ class MainWindowViewModel : BindableBase
         else
         {
             string logsFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "ExternalToolLogs");
+            if (!Directory.Exists(logsFolder)) return false;
             string prefix = $"Compare-{CompareRequest.MrType}";
             string[] logs = Directory.GetFiles(logsFolder, prefix + "*");
             _logger.Information($"Found {logs.Length} matching logs that start with: {prefix}.");
