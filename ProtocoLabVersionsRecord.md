@@ -19,3 +19,8 @@
 		Add button "Select All" to select all rows in data grid.
 		Add button "Unselect All" to unselect all rows in data grid.
 		Cancel the ability to concatenate logs.
+1.0.5.0 - 
+		New macro.
+		Responsive datagrid.
+		"Break" button to halt comparison process.
+		"Open Log" button to view a specific log, of one of the runs.
