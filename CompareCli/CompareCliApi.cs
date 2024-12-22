@@ -12,6 +12,8 @@ public static class CompareCliApi
     public record CompareRequest(string MrType, string RequirementsPath, string ActualDataPath);
     public record CompareResult();
 
+    public record MakeReqRequest(string DataPath, List<string> Protocols);
+    public record MakeReqResult();
     public class CliMgr
     {
         private static readonly ILogger _logger = Log.ForContext<CliMgr>();
@@ -19,38 +21,94 @@ public static class CompareCliApi
         private string CompareDir => Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli");
         private string CompareDataDir => Path.Combine(CompareDir, "Data");
 
-        private string CompareExePath => Path.Combine(CompareDir, "Compare.exe");
+        private string CompareExePath => Path.Combine(CompareDir, "ExternalTool.exe");
 
+        /// <summary>
+        /// Preserving previous comparison results in target folder.
+        /// </summary>
+        /// <param name="directory">Target directory to preseve its results.</param>
         private static void EmptyFolderExceptResults(DirectoryInfo directory)
         {
+            _logger.Information($"Preparing target directory: {directory}.");
             DateTime timestamp = DateTime.Now;
             string formattedTimestamp = timestamp.ToString("ddMMyy_HHmmss");
             foreach (FileInfo file in directory.GetFiles())
             {
-                if (file.Name.EndsWith("_Comparison.xlsx"))
+                if (file.Name.EndsWith("_Comparison.xlsx")) //Keeping previous results in folder.
                 {
+                    _logger.Information($"Adding timstamp to file: {file}...");
                     string newFileName = file.Name.Replace("Comparison.xlsx", "Comparison_" + formattedTimestamp + ".xlsx");
                     string newFilePath = Path.Combine(file.DirectoryName!, newFileName);
                     File.Move(file.FullName, newFilePath);
                 }
                 else if (!file.Name.Contains("_Comparison") && !file.Name.EndsWith("_Comparison"))
+                {
+                    _logger.Information($"{file} is not previous comparison results. Deleting file...");
                     file.Delete();
+                }                    
             }
             foreach (DirectoryInfo subDirectory in directory.GetDirectories()) subDirectory.Delete(true);
         }
 
+        /// <summary>
+        /// Handeling making requirements requests with external tool.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="protocols">Protocols to preserve in requirements file.</param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task<int> MakeReqAsync(MakeReqRequest request, List<string> protocols, CancellationToken ct = default)
+        {
+            void killProcesses(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
+            var resultDir = Path.Combine(CompareDataDir, "Requirements");
+            Directory.CreateDirectory(resultDir);
+            var a = protocols.ToArray();
+            _logger.Debug("Making requirements. The request: {@Request}", request);
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = CompareExePath,
+                WorkingDirectory = Path.GetDirectoryName(CompareExePath),
+                Arguments = $@"-t {"\"" + request.DataPath + "\""} -p {protocols.Aggregate((x,y)=>$"{x} {y}")} -f r",
+                // Added double quotes to allow arguments with spaces
+                CreateNoWindow = true
+            };
+
+            ProcessExtensions.StartProcessRequest startRequest = new(startInfo);
+
+            startRequest.OnOutputLine += (line) => _logger.Debug(line);
+            startRequest.OnErrorLine += (line) => _logger.Warning(line);
+
+            _logger.Debug("Starting external tool with request: {@Request}", startRequest);
+
+            killProcesses("EXCEL");
+            var exitCode = await startRequest.RunProcessAsync().ConfigureAwait(false);
+
+            _logger.Debug("External tool done with code: {ExitCode}", exitCode);
+
+            return exitCode;
+        }
+
+        /// <summary>
+        /// Handleing comapre requests with external tool.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
         public async Task<int> CompareAsync(CompareRequest request, CancellationToken ct = default)
         {
             void killProcesses(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
 
-            _logger.Debug("Comparing. The request: {@Request}", request);
+            _logger.Debug("Comparing... The request: {@Request}", request);
 
             var resultDir = Path.Combine(CompareDataDir, request.MrType);
 
             if (Directory.Exists(resultDir))
                 EmptyFolderExceptResults(new DirectoryInfo(resultDir));
             else
+            {
+                _logger.Information($"{resultDir} does not exist. Creating new folder...");
                 Directory.CreateDirectory(resultDir);
+            }
 
             var reqFileName = $"{request.MrType}_Requirements.xlsx";
             //reqFileName = Path.ChangeExtension(reqFileName, Path.GetExtension(request.RequirementsPath)); - didn't work for path with '.'
@@ -62,7 +120,7 @@ public static class CompareCliApi
             {
                 FileName = CompareExePath,
                 WorkingDirectory = Path.GetDirectoryName(CompareExePath),
-                Arguments = $@"-r {"\"" + reqFilePath + "\""} -t {"\"" + request.ActualDataPath + "\""}",
+                Arguments = $@"-r {"\"" + reqFilePath + "\""} -t {"\"" + request.ActualDataPath + "\""} -f c",
                 // Added double quotes to allow arguments with spaces
                 CreateNoWindow = true
             };
@@ -72,20 +130,22 @@ public static class CompareCliApi
             startRequest.OnOutputLine += (line) => _logger.Debug(line);
             startRequest.OnErrorLine += (line) => _logger.Warning(line);
 
-            _logger.Debug("Starting compare tool with request: {@Request}", startRequest);
+            _logger.Debug("Starting external tool with request: {@Request}", startRequest);
 
             killProcesses("EXCEL");
             var exitCode = await startRequest.RunProcessAsync().ConfigureAwait(false);
 
-            _logger.Debug("Compare tool done with code: {ExitCode}", exitCode);
+            _logger.Debug("External tool done with code: {ExitCode}", exitCode);
 
             return exitCode;
         }
 
         public string GetResultsPath(CompareRequest request) =>
-            Path.ChangeExtension(
+                Path.Combine(CompareDataDir, request.MrType, $"{request.MrType}_Comparison.xlsx");
+
+        /*Path.ChangeExtension(
                 Path.Combine(CompareDataDir, request.MrType, $"{request.MrType}_Comparison"),
-                Path.GetExtension(request.RequirementsPath));
+                Path.GetExtension(request.RequirementsPath));*/
 
         public string GetFolderPath(CompareRequest request) =>
                 Path.Combine(CompareDataDir, request.MrType);

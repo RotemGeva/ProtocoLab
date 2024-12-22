@@ -1,13 +1,14 @@
 ﻿using System.Windows.Controls;
 
+
 namespace ProtocoLab
 {
     /// <summary>
-    /// Interaction logic for YesNoDialog.xaml
+    /// Interaction logic for SelectionDialog.xaml
     /// </summary>
-    public partial class YesNoDialog : UserControl
+    public partial class SelectionDialog : UserControl
     {
-        public YesNoDialog()
+        public SelectionDialog()
         {
             InitializeComponent();
         }
