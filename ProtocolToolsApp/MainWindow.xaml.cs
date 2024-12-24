@@ -14,6 +14,11 @@ namespace ProtocoLab
         {
             InitializeComponent();
         }
+
+        private void OpenLog_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
     }
 }
 

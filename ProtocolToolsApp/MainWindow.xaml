@@ -8,46 +8,62 @@
         prism:ViewModelLocator.AutoWireViewModel="True"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance local:MainWindowViewModel}"
-        Title="ProtocoLab - 1.0.3.0" Height="600" Width="970">
+        Title="ProtocoLab - 1.0.5.0" Height="800" Width="1200">
+
   <Grid Name="Grid">
     <Grid.RowDefinitions>
-      <RowDefinition Height="40"/>
-      <RowDefinition Height="50"/>
-      <RowDefinition Height="50"/>
-      <RowDefinition Height="350"/>
+      <RowDefinition Height="60"/>
+      <RowDefinition Height="60"/>
+      <RowDefinition Height="60"/>
+      <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
 
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="203*"></ColumnDefinition>
+      <ColumnDefinition Width="1500*"></ColumnDefinition>
       <ColumnDefinition Width="527*"/>
-      <ColumnDefinition Width="120"/>
+      <ColumnDefinition Width="170"/>
     </Grid.ColumnDefinitions>
 
-    <Button Grid.Row="0" Grid.Column="2" Margin="5,5,5,5" Content="Protocol Extractor" Command="{Binding OpenProtocolExtractorCommand}"/>
-    <Button Grid.Row="1" Grid.Column="2" Margin="5,5,5,5" Content="Upload Input File" Command="{Binding UploadInputFileCommand}"/>
-    <StackPanel Name="MrTypeInfo" Grid.Row="0" Grid.Column="0" Orientation="Vertical" Grid.ColumnSpan="2">
-      <TextBlock Text="Enter MRI name (e.g MR30_Premier)"/>
-      <TextBox Grid.Row="0" x:Name="MrName" Width="300" HorizontalAlignment="Left"
-      Text="{Binding DraftItem.MrType}"/>
+    <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal">
+      <!--#region MRI name -->
+      <StackPanel Name="MrTypeInfo" Grid.Row="0" Grid.Column="0" Orientation="Vertical" Grid.ColumnSpan="2" Margin="5">
+        <TextBlock Text="Enter MRI name (e.g. MR30_Premier)" FontSize="20" FontWeight="Bold"/>
+        <TextBox Grid.Row="0" x:Name="MrName" Width="400" HorizontalAlignment="Left" Text="{Binding DraftItem.MrType}" FontSize="15"/>
+      </StackPanel>
+      <!--#endregion-->
+      <Button Grid.Row="0" Grid.Column="1" Width="150" Height="30" Content="Upload Input File" Margin="10,10,10,-10" Command="{Binding UploadInputFileCommand}" FontSize="15"/>
     </StackPanel>
 
-    <TextBlock Grid.Row="1" Text="Enter the path of requirements file" Grid.ColumnSpan="2"/>
-    <StackPanel Name="ReqInfo" Grid.Column="0" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Left" Grid.ColumnSpan="2">
-      <TextBox Grid.Row="1" x:Name="ReqEntry"  Width="300" Height="20" 
-      Text="{Binding DraftItem.ReqPath}"/>
-      <Button x:Name="AddFromFileReq" Content="Add from File" Width="100" Height="30" HorizontalAlignment="Center" Grid.Column="0"
-    Margin="10" Grid.Row="1" Command="{Binding OpenFileFromDialogReqCommand}"/>
+
+    <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal">
+      <!--#region Requirements -->
+      <StackPanel Name="ReqInfo" Grid.Column="0" Grid.Row="1" Orientation="Vertical" HorizontalAlignment="Left" Grid.ColumnSpan="2" Margin="5">
+        <TextBlock Grid.Row="1" Text="Enter requirements filepath" Grid.ColumnSpan="2" FontSize="20" FontWeight="Bold"/>
+        <TextBox Grid.Row="1" x:Name="ReqEntry" Width="400" Height="20" Text="{Binding DraftItem.ReqPath}" FontSize="15"/>
+      </StackPanel>
+      <!--#endregion-->
+      <Button x:Name="AddFromFileReq" Content="Select File" Width="150" Height="30" HorizontalAlignment="Center" Grid.Column="0"
+      Margin="10,10,10,-5" Command="{Binding OpenFileFromDialogReqCommand}" FontSize="15"/>
     </StackPanel>
 
-    <TextBlock Text="Enter the path of vendor protocol file (e.g .tar for GE)" Grid.Row="2" Grid.ColumnSpan="2"/>
     <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" Grid.ColumnSpan="2">
-      <TextBox Grid.Row="2" Name="TarEntry"  Width="300" Height="20" HorizontalAlignment="Left"
-    Text="{Binding DraftItem.ActualPath}"/>
-      <Button x:Name="AddFromFile" Content="Add from File" Width="100" Height="30" Margin="10" Command="{Binding OpenFileToCompareFromDialogCommand}"/>
-      <Button x:Name="Add" Content="Add to List" Width="100" Height="30" Margin="10" Command="{Binding AddItemCommand}"/>
-      <Button x:Name="Update" Content="Update" Width="100" Height="30" Margin="10" Command="{Binding UpdateSelectedItemCommand}"/>
+      <!--#region Actual -->
+      <StackPanel Name="ActualInfo" Grid.Column="0" Grid.Row="1" Orientation="Vertical" HorizontalAlignment="Left" Grid.ColumnSpan="2" Margin="5">
+        <TextBlock Text="Enter protocol filepath (e.g. tar)" Grid.Row="2" Grid.ColumnSpan="2" FontSize="20" FontWeight="Bold"/>
+        <TextBox Grid.Row="2" Name="TarEntry"  Width="400" Height="20" HorizontalAlignment="Left" FontSize="15"
+        Text="{Binding DraftItem.ActualPath}"/>
+      </StackPanel>
+      <!--#endregion-->
+
+      <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Stretch" Grid.ColumnSpan="2" Margin="0,0,0, -20">
+        <Button x:Name="AddFromFile" Content="Select File" Width="100" Height="30" HorizontalAlignment="Stretch" Margin="5" FontSize="15" Command="{Binding OpenFileToCompareFromDialogCommand}"/>
+        <Button x:Name="Add" Content="Add to List" Width="100" Height="30" HorizontalAlignment="Stretch" Margin="5" FontSize="15" Command="{Binding AddItemCommand}"/>
+        <Button x:Name="Update" Content="Update" Width="100" Height="30" HorizontalAlignment="Stretch" Margin="5" FontSize="15" Command="{Binding UpdateSelectedItemCommand}"/>
+        <Button x:Name="MakeReq" Content="Make Req" Width="100" Height="30" HorizontalAlignment="Stretch" Margin="5" FontSize="15" Command="{Binding MakeRequirementsAsyncCommand}"/>
+      </StackPanel>
     </StackPanel>
-    <DataGrid Grid.Row="3" Name="dataGrid1" Margin="10,10,10,10" AutoGenerateColumns="False" ItemsSource="{Binding CompareItems}" SelectedItem="{Binding SelectedItem}" Grid.ColumnSpan="2">
+
+    <DataGrid  Grid.Row="3" Name="dataGrid1" Margin="10,10,10,10" AutoGenerateColumns="False" ItemsSource="{Binding CompareItems}" SelectedItem="{Binding SelectedItem}" Grid.ColumnSpan="2" FontSize="15" FontWeight="SemiBold">
       <DataGrid.Columns>
         <DataGridTemplateColumn  Header="">
           <DataGridTemplateColumn.CellTemplate>
@@ -56,21 +72,28 @@
             </DataTemplate>
           </DataGridTemplateColumn.CellTemplate>
         </DataGridTemplateColumn>
-        <DataGridTextColumn Header="MR Type" Binding="{Binding MrType}"/>
-        <DataGridTextColumn Header="Requirements" Binding="{Binding ReqPath}"/>
-        <DataGridTextColumn Header="File to Compare" Binding="{Binding ActualPath}"/>
-        <DataGridTextColumn Header="Execution Status" Binding="{Binding ExecutionStatus}"/>
+        <DataGridTextColumn Header="MR Type" Binding="{Binding MrType}" Width="*"/>
+        <DataGridTextColumn Header="Requirements" Binding="{Binding ReqPath}" Width="*"/>
+        <DataGridTextColumn Header="File to Compare" Binding="{Binding ActualPath}" Width="*"/>
+        <DataGridTextColumn Header="Execution Status" Binding="{Binding ExecutionStatus}" Width="*"/>
       </DataGrid.Columns>
     </DataGrid>
 
-    <StackPanel Grid.Column="2" Grid.Row="3" Orientation="Vertical" Margin="10,10,10,10" Height="Auto">
-      <Button x:Name="Compare" Content="Compare" Width="100" Height="30" Command="{Binding CompareAsyncCommand}"/>
-      <Button x:Name="CompareAll" Content="Compare All" Width="100" Height="30" Command="{Binding CompareAllAsyncCommand}"/>
-      <Button x:Name="DeleteItem" Content="Delete" Width="100" Height="30" Command="{Binding DeleteItemCommand}"/>
-      <Button x:Name="DeleteAllItems" Content="Delete All" Width="100" Height="30" Command="{Binding DeleteAllItemsCommand}"/>
-      <Button x:Name="OpenRes" Content="Open Result" Width="100" Height="30" Command="{Binding OpenResultCommand}"/>
-      <Button x:Name="OpenFolder" Content="Open Folder" Width="100" Height="30" Command="{Binding OpenFolderCommand}"/>
-      <Button x:Name="OpenLog" Content="Open Latest Log" Width="100" Height="30" Command="{Binding OpenLatestLogCommand}"/>
+    <!--#region Functionalities -->
+    <StackPanel Grid.Column="2" Grid.Row="3" Orientation="Vertical" Margin="5" Height="Auto">
+      <Button x:Name="Compare" Content="Compare" Width="130" Height="30" FontSize="15" Command="{Binding CompareAsyncCommand}"/>
+      <Button x:Name="CompareAll" Content="Compare All" Width="130" Height="30" FontSize="15" Command="{Binding CompareAllAsyncCommand}"/>
+      <Button x:Name="BreakComparison" Content="Break" Width="130" Height="30" FontSize="15" Command="{Binding InterruptComparisonCommand}"/>
+      <Button x:Name="DeleteItem" Content="Delete" Width="130" Height="30" Margin="15,15,15,0" FontSize="15" Command="{Binding DeleteItemCommand}"/>
+      <Button x:Name="DeleteAllItems" Content="Delete All" Width="130" Height="30" FontSize="15" Command="{Binding DeleteAllItemsCommand}"/>
+      <Button x:Name="OpenRes" Content="Open Result" Width="130" Height="30" Margin="15,15,15,0" FontSize="15" Command="{Binding OpenResultCommand}"/>
+      <Button x:Name="OpenFolder" Content="Open Folder" Width="130" Height="30" FontSize="15" Command="{Binding OpenFolderCommand}"/>
+      <Button x:Name="OpenLatestLog" Content="Open Latest Log" Width="130" Margin="15,15,15,0" Height="30" FontSize="15" Command="{Binding OpenLatestLogCommand}"/>
+      <Button x:Name="OpenLog" Content="Open Log" Width="130" Height="30" FontSize="15" Command="{Binding OpenLogCommand}"/>
+      <Button x:Name="OpenRequirements" Content="Req Folder" Width="130" Height="30" Margin="15,15,15,0" FontSize="15" Command="{Binding OpenRequirementsCommand}"/>
+      <Button x:Name="SelectAll" Content="Select All" Width="130" Height="30" FontSize="15" Margin="15,15,15,0" Command="{Binding SelectAllCommand}"/>
+      <Button x:Name="UnselectAll" Content="Unselect All" Width="130" Height="30" FontSize="15" Command="{Binding UnselectAllCommand}"/>
     </StackPanel>
+    <!--#endregion-->
   </Grid>
 </Window>
