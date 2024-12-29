@@ -35,6 +35,7 @@ class MainWindowViewModel : BindableBase
     private bool _hasSelectedItems;
     private bool _reqFolderExist;
     private bool _isComparisonInterrupted;
+    private bool _isModifyComparisonSummaryChecked;
 
     public ReadOnlyObservableCollection<CompareItem> CompareItems { get; }
 
@@ -217,6 +218,12 @@ class MainWindowViewModel : BindableBase
         });
     }
 
+    public bool IsModifyComparisonSummaryChecked
+    {
+        get => _isModifyComparisonSummaryChecked;
+        set => SetProperty(ref _isModifyComparisonSummaryChecked, value);
+    }
+
     public bool HasItems
     {
         get => _hasItems;
@@ -349,13 +356,27 @@ class MainWindowViewModel : BindableBase
 
     private async Task HandleCompareAllAsync(bool selectedOnly = false)
     {
+        // Handling comparison summary files
+        _logger.Information($"ModifyComparisonSummary status is: {IsModifyComparisonSummaryChecked}");
+        if (IsModifyComparisonSummaryChecked == true)
+        {
+            FileInfo comparisonSummaryFilepath = new(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "Comparison_Summary.csv"));
+            FileInfo comparisonDetailesSummaryFilepath = new(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "Comparison_Details_Summary.txt"));
+            AddTimestamp(comparisonSummaryFilepath);
+            AddTimestamp(comparisonDetailesSummaryFilepath);
+        }
+
+        
+        // Handling compare process
         _logger.Information($"Starting to compare all with selectedOnly mode: {selectedOnly}");
         IsComparing = true;
         _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Start comparing..."));
         var itemsToCompare = selectedOnly ? _compareItems.Where(x => x.IsSelected) : _compareItems;
-        foreach (CompareItem item in itemsToCompare) // Restarting execution status
+
+        // Restarting execution status
+        foreach (CompareItem item in itemsToCompare) 
         {
-            _logger.Information($"Restarting execution statues for: {item}.");
+            _logger.Information($"Restarting execution status for: {item.MrType}.");
             item.ExecutionStatus = "";
         }
         bool isSuccess = true;
@@ -400,6 +421,21 @@ class MainWindowViewModel : BindableBase
             _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process terminated with errors. Check log"));
         IsComparing = false;
         OpenLatestLogCommand.RaiseCanExecuteChanged();
+
+        void AddTimestamp(FileInfo file)
+        {
+            DateTime timestamp = DateTime.Now;
+            string formattedTimestamp = timestamp.ToString("ddMMyy_HHmmss");
+
+            if (file.Exists)
+            {
+                _logger.Information($"{file.FullName} exists. Adding timstamp to file...");
+                string newFileName = file.Name.Replace(file.Name, Path.GetFileNameWithoutExtension(file.Name) + "_" + formattedTimestamp + file.Extension);
+                string newFilePath = Path.Combine(file.DirectoryName!, newFileName);
+                File.Move(file.FullName, newFilePath);
+            }
+            else _logger.Information($"{file.FullName} does not exist.");
+        }
     }
 
     private bool CanInterruptComparison() => IsComparing;
@@ -804,8 +840,7 @@ class MainWindowViewModel : BindableBase
         string logsFolderPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "ExternalToolLogs");
         if (Directory.Exists(logsFolderPath))
         {
-            if (!Directory.EnumerateFileSystemEntries(logsFolderPath).Any()) // Checks if logs folder is empty.
-                return false;
+            if (!Directory.EnumerateFileSystemEntries(logsFolderPath).Any()) return false; // Checks if logs folder is empty. 
             else return true;
         }
         return false;

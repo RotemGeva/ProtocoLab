@@ -93,6 +93,7 @@
       <Button x:Name="OpenRequirements" Content="Req Folder" Width="130" Height="30" Margin="15,15,15,0" FontSize="15" Command="{Binding OpenRequirementsCommand}"/>
       <Button x:Name="SelectAll" Content="Select All" Width="130" Height="30" FontSize="15" Margin="15,15,15,0" Command="{Binding SelectAllCommand}"/>
       <Button x:Name="UnselectAll" Content="Unselect All" Width="130" Height="30" FontSize="15" Command="{Binding UnselectAllCommand}"/>
+      <CheckBox x:Name="ModifyComparsionSummary" Content="Modify Comparison Summary" Margin="10" IsChecked="{Binding IsModifyComparisonSummaryChecked}"/>
     </StackPanel>
     <!--#endregion-->
   </Grid>
