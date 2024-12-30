@@ -40,6 +40,20 @@ class Compare:
             sys.exit(1)
 
     def extract_tar(self):
+        # Reset temp\Compare folder
+        compare_folder_path = f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}'
+        if os.path.exists(compare_folder_path):
+            logging.info(f'The folder: {compare_folder_path} already exists. Deleting the folder...')
+            try:
+                shutil.rmtree(compare_folder_path)
+                logging.info(f"Deleted {compare_folder_path} successfully. Creating new folder under the same path...")
+                os.mkdir(compare_folder_path)
+                logging.info(f'Successfully created a new folder: {compare_folder_path}')
+            except Exception as err:
+                logging.error(f'Failed to reset folder: {compare_folder_path}. error: {err}.')
+                raise Exception(f'Failed to reset folder: {compare_folder_path}. error: {err}.')
+
+        # Extracting TAR
         try:
             logging.info('Start to open TAR file...')
             my_tar = tarfile.open(self.parameters.path_for_tar)
@@ -74,7 +88,8 @@ class Compare:
             logging.info(f'Could not retrieve sheets name from Excel file.\nError: {err}.')
             raise Exception(f'Could not receive sheets name from Excel file.\nError: {err}.')
 
-        # Get a list of all protocols in the file and drove it into a variable
+
+        # Get a list of all protocols found in the TAR file
         list_of_all_protocols = os.listdir(f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}')
         logging.info(
             f'List of all extracted protocols in {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}: {list_of_all_protocols}')
