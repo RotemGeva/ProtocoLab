@@ -24,3 +24,5 @@
 		Responsive datagrid.
 		"Break" button to halt comparison process.
 		"Open Log" button to view a specific log, of one of the runs.
+1.0.5.1 -
+		
