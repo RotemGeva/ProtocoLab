@@ -830,8 +830,8 @@ class MainWindowViewModel : BindableBase
         string prefix = $"Compare-{CompareRequest!.MrType}";
         string[] logs = Directory.GetFiles(logsFolder, prefix + "*");
         var sortedLogs = logs.OrderByDescending(file => File.GetCreationTime(file)).ToArray();
-        _logger.Information($"The latest log that contains the prefix: {prefix} is: {sortedLogs[sortedLogs.Length-1]}.");
-        Process.Start("notepad.exe", sortedLogs[sortedLogs.Length - 1]);
+        _logger.Information($"The latest log that contains the prefix: {prefix} is: {sortedLogs[0]}.");
+        Process.Start("notepad.exe", sortedLogs[0]);
     }
 
 
