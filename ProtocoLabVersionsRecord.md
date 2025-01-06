@@ -25,4 +25,7 @@
 		"Break" button to halt comparison process.
 		"Open Log" button to view a specific log, of one of the runs.
 1.0.5.1 -
-		
+		SQAT-6 fix.
+		SQAT-17 fix.
+1.0.5.2 -
+		Add remove_readonly function to extract_tar function, to remove read-only attribute if folder cannot be deleted.

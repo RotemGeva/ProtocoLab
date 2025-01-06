@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+import stat
 import subprocess
 import glob
 import openpyxl
@@ -15,6 +16,13 @@ def resource_path(relative_path):
     # """ Get absolute path to resource, works for dev and for PyInstaller """
     base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
+
+
+def remove_readonly(func, path, exc_info):
+    # Change file/folder to be writable before attempting to delete
+    logging.info(f'Failed to delete {path}. removing read-only attribute...')
+    os.chmod(path, stat.S_IWRITE)  # Removes read-only attribute
+    func(path)
 
 
 class Compare:
@@ -45,7 +53,7 @@ class Compare:
         if os.path.exists(compare_folder_path):
             logging.info(f'The folder: {compare_folder_path} already exists. Deleting the folder...')
             try:
-                shutil.rmtree(compare_folder_path)
+                shutil.rmtree(compare_folder_path, onerror=remove_readonly)
                 logging.info(f"Deleted {compare_folder_path} successfully. Creating new folder under the same path...")
                 os.mkdir(compare_folder_path)
                 logging.info(f'Successfully created a new folder: {compare_folder_path}')
@@ -87,7 +95,6 @@ class Compare:
         except Exception as err:
             logging.info(f'Could not retrieve sheets name from Excel file.\nError: {err}.')
             raise Exception(f'Could not receive sheets name from Excel file.\nError: {err}.')
-
 
         # Get a list of all protocols found in the TAR file
         list_of_all_protocols = os.listdir(f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}')
