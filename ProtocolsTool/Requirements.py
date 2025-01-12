@@ -163,8 +163,8 @@ class Requirements:
             logging.info(f'The following sheets are found in file: {requirement_file.sheetnames}')
             for sheet in requirement_file.sheetnames:
                 logging.info(f'Checking if sheet {sheet} was selected...')
-                if sheet not in parameters.protocols:
-                    logging.info(f'{sheet} was not found in {parameters.protocols}. Deleting: {sheet}...')
+                if sheet not in parameters.protocol_elements:
+                    logging.info(f'{sheet} was not found in {parameters.protocol_elements}. Deleting: {sheet}...')
                     del requirement_file[sheet]
                     logging.info('Deleted sheet.')
         except Exception as err:

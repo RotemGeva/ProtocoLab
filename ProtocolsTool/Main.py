@@ -58,22 +58,22 @@ def check_previous_log_files():
 parser = argparse.ArgumentParser()
 parser.add_argument("-r", "--req_path", help="Full path to requirements file")
 parser.add_argument("-t", "--tar_path", required=True, help="Full path to tar file")
-parser.add_argument("-f", "--function", required=True, help="Compare (c), Make ""requirements (r)")
+parser.add_argument("-f", "--function", required=True, choices=['c', 'r', 'p'],
+                    help="Compare (c), Create requirements (r)")
 parser.add_argument("-p", "--protocols", nargs='+', help="List of protocols")
 args = parser.parse_args()
 
 # Concatenate log files
 # last_log_file = check_previous_log_files()
 
-# Compare\Make Requirements
 match args.function:
-    case 'c':
+    case 'c':  # Compare
         mr_name = Path(args.req_path).name.replace('_Requirements.xlsx', '')
         create_log_file(name="Compare-" + mr_name)
         parameters = ApplicationParameters(args.req_path, args.tar_path, mr_name, args.protocols)
         logging.info(f'Compare request with parameters: {parameters.__str__()}.')
         Compare(parameters)
-    case 'r':
+    case 'r':  # Create requirements
         mr_name = os.path.splitext(os.path.basename(args.tar_path))[0]
         create_log_file(name="Requirements-" + mr_name)
         if args.protocols is None:
