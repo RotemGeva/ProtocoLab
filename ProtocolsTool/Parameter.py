@@ -14,6 +14,10 @@ class Parameter:
     def value(self):
         return self._value
 
+    def to_dict(self):
+        return {"Name:": self._name, "Value": self._value, "Range Flag": self._range_flag,
+                "Min Value": self._min_value, "Max Value": self._max_value}
+
     def __str__(self):
         return f'{self._name}, {self._value} [{self._range_flag}, {self._min_value}-{self._max_value}]'
 

@@ -26,6 +26,9 @@ class Sequence:
         logging.info(f'Checking if parameter {name} already exists in {self._name}...')
         return name in self._parameters.keys()
 
+    def to_dict(self):
+        return {"Sequence:": self._name, "Parameters": self._parameters}
+
     def __str__(self):
         str = f'Sequence name: {self._name} \nParameters:\n'
         for parameter in self._parameters.values():

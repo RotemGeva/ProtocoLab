@@ -1,3 +1,4 @@
+from XMLParser import XMLParser
 import logging
 import os
 import shutil
@@ -37,7 +38,9 @@ class Compare:
             if 'ProtocolExtractor' not in os.listdir('Data'):
                 logging.info(f'Protocol Extractor tool does not exist in {os.getcwd()}\\Data.')
                 self.prepare_protocol_extractor_for_compare()
-            self.activate_protocol_extractor()
+            if os.path.splitext(self.parameters.path_for_tar)[1] == '.xml':  # Get file extension
+                parsed_xml = XMLParser.handle_parsing(self.parameters.path_for_tar)
+            self.activate_protocol_extractor(parsed_xml, mode='Siemens')
             self.move_protocol_extractor_output()
             self.prepare_for_comparison()
             self.compare()
@@ -46,6 +49,7 @@ class Compare:
         except Exception as err:
             logging.error(f'Error during comparison: {err}.')
             sys.exit(1)
+
 
     def extract_tar(self):
         # Reset temp\Compare folder
@@ -146,7 +150,7 @@ class Compare:
             logging.info(f'Could not move Protocol Extractor tool to {os.getcwd()}\\Data.\nError: {err}.')
             raise Exception(f'Could not move Protocol Extractor tool to {os.getcwd()}\\Data.\nError: {err}.')
 
-    def activate_protocol_extractor(self):
+    def activate_protocol_extractor(self, parsed_xml=None, mode='GE'):
         # remove all xls files from extractor folder
         logging.info(f'Removing all .xlsx files from Protocol Extractor folder...')
         try:
@@ -160,20 +164,39 @@ class Compare:
         except Exception as err:
             logging.info(f'Failed to remove all .xlsx files from Protocol Extractor folder.\nError: {err}.')
             raise Exception(f'Failed to remove all .xlsx files from Protocol Extractor folder.\nError: {err}.')
+        match mode:
+            case 'GE':
+                logging.info('Performing GE scenario...')
+                try:
+                    logging.info(
+                        f'Running Protocol Extractor tool, command: {os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor'
+                        f'.exe'
+                        f'-f {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare -m '
+                        f'{os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini...')
+                    subprocess.run(
+                        f'{os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor.exe -f {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare -m {os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini',
+                        cwd=f'{os.getcwd()}\\Data\\ProtocolExtractor')
+                    logging.info(f'Protocol Extractor tool was executed successfully.')
+                except Exception as err:
+                    logging.info(f'failed to run Protocol Extractor tool.\nError: {err}.')
+                    raise Exception(f'failed to run Protocol Extractor tool.\nError: {err}.')
+            # TODO: Fill in Siemens scenario
+            case 'Siemens':
+                logging.info('Performing Siemens scenario...')
+                try:
+                    logging.info(
+                        f'Running Protocol Extractor tool, command: {os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor'
+                        f'.exe'
+                        f'-f {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare -m '
+                        f'{os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini...')
+                    subprocess.run(
+                        f'{os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor.exe -f {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare -m {os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini',
+                        cwd=f'{os.getcwd()}\\Data\\ProtocolExtractor')
+                    logging.info(f'Protocol Extractor tool was executed successfully.')
+                except Exception as err:
+                    logging.info(f'failed to run Protocol Extractor tool.\nError: {err}.')
+                    raise Exception(f'failed to run Protocol Extractor tool.\nError: {err}.')
 
-        try:
-            logging.info(
-                f'Running Protocol Extractor tool, command: {os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor'
-                f'.exe'
-                f'-f {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare -m '
-                f'{os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini...')
-            subprocess.run(
-                f'{os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor.exe -f {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare -m {os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini',
-                cwd=f'{os.getcwd()}\\Data\\ProtocolExtractor')
-            logging.info(f'Protocol Extractor tool was executed successfully.')
-        except Exception as err:
-            logging.info(f'failed to run Protocol Extractor tool.\nError: {err}.')
-            raise Exception(f'failed to run Protocol Extractor tool.\nError: {err}.')
 
     def move_protocol_extractor_output(self):
         for file in os.listdir(f'{os.getcwd()}\\Data\\ProtocolExtractor'):

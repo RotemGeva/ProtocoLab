@@ -3,6 +3,7 @@ from Protocol import Protocol
 from Parameter import Parameter
 from Sequence import Sequence
 import logging
+import json
 
 
 class XMLParser:
@@ -102,34 +103,56 @@ class XMLParser:
             logging.warning(f'Failed to retrieve mr information from last sequence. error: {e}')
             return 'mr_type', 'field_strength'
 
+    @staticmethod
+    def custom_serializer(obj):
+        if hasattr(obj, 'to_dict'):  # Check if the object has a 'to_dict' method
+            return obj.to_dict()
+
+    @staticmethod
+    def create_protocols(xml_parser, mr_type, field_strength, protocol_elements, sequence_elements):
+        print_protocol_index = 0  # To iterate PrintProtocol elements within the whole file
+        protocols_list = []
+        # Create protocols according to xml file
+        for protocol_element in protocol_elements:
+            current_protocol_name = protocol_element.get('name')
+            current_protocol = Protocol(name=current_protocol_name, mr_type=mr_type, field_strength=field_strength,
+                                        grad_coil_type='gct')
+
+            # Add sequences to existing protocol
+            sequences_names_for_protocol = xml_parser.get_all_sequences_names(protocol_element)
+            sequence_elements_for_protocol = sequence_elements[
+                                             print_protocol_index:print_protocol_index + len(
+                                                 sequences_names_for_protocol)]
+            for index, sequence_element in enumerate(sequence_elements_for_protocol):
+                sequence = Sequence(sequences_names_for_protocol[index])
+                xml_parser.fill_in_parameters(sequence_element, sequence)
+                current_protocol.add_sequence(sequence)
+            print_protocol_index += len(sequences_names_for_protocol)
+            protocols_list.append(current_protocol)
+        return protocols_list
+
+    @staticmethod
+    def handle_parsing(xml_filepath):
+        # Parse xml file
+        xml_parser = XMLParser(xml_filepath)
+        xml_parser.parse()
+
+        # Retrieve all relevant elements
+        protocol_elements = xml_parser.get_all_protocol_elements()
+        sequence_elements = xml_parser.get_all_sequence_elements()
+
+        # Retrieve general info regrading MR type and field strength
+        mr_type, field_strength = xml_parser.get_mr_general_info(protocol_elements[0])
+
+        # Parse xml file into protocols list
+        protocols_list = xml_parser.create_protocols(xml_parser, mr_type, field_strength, protocol_elements, sequence_elements)
+
+        # Dump protocols to json
+        protocols_dict = [protocol.to_dict() for protocol in protocols_list]
+        json_data = json.dumps(protocols_dict, default=xml_parser.custom_serializer, indent=4)
+        return json_data
+
 
 if __name__ == '__main__':
-    # Parse xml file
-    xml_filepath = 'VA50_LUMINA.xml'
-    xml_parser = XMLParser(xml_filepath)
-    xml_parser.parse()
-
-    # Retrieve all relevant elements
-    protocol_elements = xml_parser.get_all_protocol_elements()
-    sequence_elements = xml_parser.get_all_sequence_elements()
-
-    # Retrieve general info regrading MR type and field strength
-    mr_type, field_strength = xml_parser.get_mr_general_info(protocol_elements[0])
-
-    print_protocol_index = 0  # To iterate PrintProtocol elements within the whole file
-    protocols_list = []
-    # Create protocols according to xml file
-    for protocol_element in protocol_elements:
-        current_protocol_name = protocol_element.get('name')
-        current_protocol = Protocol(name=current_protocol_name, mr_type=mr_type, field_strength=field_strength,
-                                    grad_coil_type='gct')
-
-        # Add sequences to existing protocol
-        sequences_names_for_protocol = xml_parser.get_all_sequences_names(protocol_element)
-        sequence_elements_for_protocol = sequence_elements[print_protocol_index:print_protocol_index + len(sequences_names_for_protocol)]
-        for index, sequence_element in enumerate(sequence_elements_for_protocol):
-            sequence = Sequence(sequences_names_for_protocol[index])
-            xml_parser.fill_in_parameters(sequence_element, sequence)
-            current_protocol.add_sequence(sequence)
-        print_protocol_index += len(sequences_names_for_protocol)
-        protocols_list.append(current_protocol)
+    data = XMLParser.handle_parsing('VA50_LUMINA.xml')
+    print(data)
