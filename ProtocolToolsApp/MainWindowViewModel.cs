@@ -420,6 +420,7 @@ class MainWindowViewModel : BindableBase
         else
             _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process terminated with errors. Check log"));
         IsComparing = false;
+        IsModifyComparisonSummaryChecked = false;
         OpenLatestLogCommand.RaiseCanExecuteChanged();
 
         void AddTimestamp(FileInfo file)
