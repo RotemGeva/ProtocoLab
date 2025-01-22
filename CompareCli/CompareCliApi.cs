@@ -14,14 +14,17 @@ public static class CompareCliApi
 
     public record MakeReqRequest(string DataPath, List<string> Protocols);
     public record MakeReqResult();
+    public record ParseXMLRequest(string ActualDataPath);
+    public record ParseXMLResult();
+
     public class CliMgr
     {
         private static readonly ILogger _logger = Log.ForContext<CliMgr>();
 
-        private string CompareDir => Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli");
-        private string CompareDataDir => Path.Combine(CompareDir, "Data");
+        private string ExternalToolDir => Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.Location)!, "cli");
+        private string ExternalToolDataDir => Path.Combine(ExternalToolDir, "Data");
 
-        private string CompareExePath => Path.Combine(CompareDir, "ExternalTool.exe");
+        private string ExternalToolExePath => Path.Combine(ExternalToolDir, "ExternalTool.exe");
 
         /// <summary>
         /// Preserving previous comparison results in target folder.
@@ -51,6 +54,43 @@ public static class CompareCliApi
         }
 
         /// <summary>
+        /// Handling parsing XML requests with external tool.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="DataPath"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task<int> ParseXMLAsync(ParseXMLRequest request, string ActualDataPath, CancellationToken ct = default)
+        {
+            var resultDir = Path.Combine(ExternalToolDataDir, "temp", "Requirements");
+            if (Directory.Exists(resultDir))
+                Directory.Delete(resultDir, true); 
+            Directory.CreateDirectory(resultDir);
+            _logger.Debug("Parsing XML. The request: {@Request}", request);
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = ExternalToolExePath,
+                WorkingDirectory = Path.GetDirectoryName(ExternalToolExePath),
+                Arguments = $@"-a {"\"" + request.ActualDataPath + "\""} -f x",
+                // Added double quotes to allow arguments with spaces
+                CreateNoWindow = true
+            };
+
+            ProcessExtensions.StartProcessRequest startRequest = new(startInfo);
+
+            startRequest.OnOutputLine += (line) => _logger.Debug(line);
+            startRequest.OnErrorLine += (line) => _logger.Warning(line);
+
+            _logger.Debug("Starting external tool with request: {@Request}", startRequest);
+
+            var exitCode = await startRequest.RunProcessAsync().ConfigureAwait(false);
+
+            _logger.Debug("External tool done with code: {ExitCode}", exitCode);
+
+            return exitCode;
+        }
+
+        /// <summary>
         /// Handeling making requirements requests with external tool.
         /// </summary>
         /// <param name="request"></param>
@@ -60,15 +100,15 @@ public static class CompareCliApi
         public async Task<int> MakeReqAsync(MakeReqRequest request, List<string> protocols, CancellationToken ct = default)
         {
             void killProcesses(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
-            var resultDir = Path.Combine(CompareDataDir, "Requirements");
+            var resultDir = Path.Combine(ExternalToolDataDir, "Requirements");
             Directory.CreateDirectory(resultDir);
             var a = protocols.ToArray();
             _logger.Debug("Making requirements. The request: {@Request}", request);
             ProcessStartInfo startInfo = new()
             {
-                FileName = CompareExePath,
-                WorkingDirectory = Path.GetDirectoryName(CompareExePath),
-                Arguments = $@"-t {"\"" + request.DataPath + "\""} -p {protocols.Aggregate((x,y)=>$"{x} {y}")} -f r",
+                FileName = ExternalToolExePath,
+                WorkingDirectory = Path.GetDirectoryName(ExternalToolExePath),
+                Arguments = $@"-a {"\"" + request.DataPath + "\""} -p {protocols.Aggregate((x,y)=>$"{x} {y}")} -f r",
                 // Added double quotes to allow arguments with spaces
                 CreateNoWindow = true
             };
@@ -100,7 +140,7 @@ public static class CompareCliApi
 
             _logger.Debug("Comparing... The request: {@Request}", request);
 
-            var resultDir = Path.Combine(CompareDataDir, request.MrType);
+            var resultDir = Path.Combine(ExternalToolDataDir, request.MrType);
 
             if (Directory.Exists(resultDir))
                 EmptyFolderExceptResults(new DirectoryInfo(resultDir));
@@ -118,9 +158,9 @@ public static class CompareCliApi
 
             ProcessStartInfo startInfo = new()
             {
-                FileName = CompareExePath,
-                WorkingDirectory = Path.GetDirectoryName(CompareExePath),
-                Arguments = $@"-r {"\"" + reqFilePath + "\""} -t {"\"" + request.ActualDataPath + "\""} -f c",
+                FileName = ExternalToolExePath,
+                WorkingDirectory = Path.GetDirectoryName(ExternalToolExePath),
+                Arguments = $@"-r {"\"" + reqFilePath + "\""} -a {"\"" + request.ActualDataPath + "\""} -f c",
                 // Added double quotes to allow arguments with spaces
                 CreateNoWindow = true
             };
@@ -141,13 +181,13 @@ public static class CompareCliApi
         }
 
         public string GetResultsPath(CompareRequest request) =>
-                Path.Combine(CompareDataDir, request.MrType, $"{request.MrType}_Comparison.xlsx");
+                Path.Combine(ExternalToolDataDir, request.MrType, $"{request.MrType}_Comparison.xlsx");
 
         /*Path.ChangeExtension(
                 Path.Combine(CompareDataDir, request.MrType, $"{request.MrType}_Comparison"),
                 Path.GetExtension(request.RequirementsPath));*/
 
         public string GetFolderPath(CompareRequest request) =>
-                Path.Combine(CompareDataDir, request.MrType);
+                Path.Combine(ExternalToolDataDir, request.MrType);
     }
 }

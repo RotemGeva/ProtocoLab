@@ -8,7 +8,7 @@
         prism:ViewModelLocator.AutoWireViewModel="True"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance local:MainWindowViewModel}"
-        Title="ProtocoLab - 1.0.5.0" Height="800" Width="1200">
+        Title="ProtocoLab - 1.0.6.0" Height="800" Width="1200">
 
   <Grid Name="Grid">
     <Grid.RowDefinitions>
@@ -21,7 +21,7 @@
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="1500*"></ColumnDefinition>
       <ColumnDefinition Width="527*"/>
-      <ColumnDefinition Width="170"/>
+      <ColumnDefinition Width="210"/>
     </Grid.ColumnDefinitions>
 
     <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal">
@@ -81,6 +81,7 @@
 
     <!--#region Functionalities -->
     <StackPanel Grid.Column="2" Grid.Row="3" Orientation="Vertical" Margin="5" Height="Auto">
+      <CheckBox x:Name="ModifyComparsionSummary" Content="Reset Comparison Summary" Margin="10" IsChecked="{Binding IsModifyComparisonSummaryChecked}"/>
       <Button x:Name="Compare" Content="Compare" Width="130" Height="30" FontSize="15" Command="{Binding CompareAsyncCommand}"/>
       <Button x:Name="CompareAll" Content="Compare All" Width="130" Height="30" FontSize="15" Command="{Binding CompareAllAsyncCommand}"/>
       <Button x:Name="BreakComparison" Content="Break" Width="130" Height="30" FontSize="15" Command="{Binding InterruptComparisonCommand}"/>

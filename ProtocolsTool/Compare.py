@@ -1,6 +1,8 @@
+from XMLParser import XMLParser
 import logging
 import os
 import shutil
+import stat
 import subprocess
 import glob
 import openpyxl
@@ -15,6 +17,13 @@ def resource_path(relative_path):
     # """ Get absolute path to resource, works for dev and for PyInstaller """
     base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
+
+
+def remove_readonly(func, path, exc_info):
+    # Change file/folder to be writable before attempting to delete
+    logging.info(f'Failed to delete {path}. removing read-only attribute...')
+    os.chmod(path, stat.S_IWRITE)  # Removes read-only attribute
+    func(path)
 
 
 class Compare:
@@ -39,7 +48,22 @@ class Compare:
             logging.error(f'Error during comparison: {err}.')
             sys.exit(1)
 
+
     def extract_tar(self):
+        # Reset temp\Compare folder
+        compare_folder_path = f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}'
+        if os.path.exists(compare_folder_path):
+            logging.info(f'The folder: {compare_folder_path} already exists. Deleting the folder...')
+            try:
+                shutil.rmtree(compare_folder_path, onerror=remove_readonly)
+                logging.info(f"Deleted {compare_folder_path} successfully. Creating new folder under the same path...")
+                os.mkdir(compare_folder_path)
+                logging.info(f'Successfully created a new folder: {compare_folder_path}')
+            except Exception as err:
+                logging.error(f'Failed to reset folder: {compare_folder_path}. error: {err}.')
+                raise Exception(f'Failed to reset folder: {compare_folder_path}. error: {err}.')
+
+        # Extracting TAR
         try:
             logging.info('Start to open TAR file...')
             my_tar = tarfile.open(self.parameters.path_for_tar)
@@ -74,7 +98,7 @@ class Compare:
             logging.info(f'Could not retrieve sheets name from Excel file.\nError: {err}.')
             raise Exception(f'Could not receive sheets name from Excel file.\nError: {err}.')
 
-        # Get a list of all protocols in the file and drove it into a variable
+        # Get a list of all protocols found in the TAR file
         list_of_all_protocols = os.listdir(f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}')
         logging.info(
             f'List of all extracted protocols in {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}: {list_of_all_protocols}')
@@ -138,7 +162,7 @@ class Compare:
         except Exception as err:
             logging.info(f'Failed to remove all .xlsx files from Protocol Extractor folder.\nError: {err}.')
             raise Exception(f'Failed to remove all .xlsx files from Protocol Extractor folder.\nError: {err}.')
-
+        logging.info('Performing GE scenario...')
         try:
             logging.info(
                 f'Running Protocol Extractor tool, command: {os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor'
@@ -152,6 +176,8 @@ class Compare:
         except Exception as err:
             logging.info(f'failed to run Protocol Extractor tool.\nError: {err}.')
             raise Exception(f'failed to run Protocol Extractor tool.\nError: {err}.')
+
+
 
     def move_protocol_extractor_output(self):
         for file in os.listdir(f'{os.getcwd()}\\Data\\ProtocolExtractor'):
