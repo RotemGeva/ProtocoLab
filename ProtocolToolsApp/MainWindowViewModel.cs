@@ -14,6 +14,7 @@ using System.Collections.Specialized;
 using ICSharpCode.SharpZipLib.Tar;
 using System.Text.RegularExpressions;
 using Path = System.IO.Path;
+using DryIoc;
 
 namespace ProtocoLab;
 
@@ -623,6 +624,14 @@ class MainWindowViewModel : BindableBase
     {
         _logger.Information("User requested to make requirements.");
         Process[] pname = Process.GetProcessesByName("EXCEL");
+        var fileExtension = Path.GetExtension(DraftItem!.ActualPath);
+        var mode = fileExtension switch
+        {
+            ".tar" => "GE",
+            ".xml" => "Siemens",
+            _ => null 
+        };
+
         if (pname.Length != 0)//excel is open
         {
             IDialogResult dr = await _dialogService.ShowDialogAsync("YesNoDialog", new DialogParameters("message=All excel processes will be terminated. " +
@@ -630,26 +639,61 @@ class MainWindowViewModel : BindableBase
 
             if (dr != null && dr.Result == ButtonResult.OK)
             {
-                await HandleMakeRequirementsAsync();
+                await HandleMakeRequirementsAsync(mode);
                 OpenRequirementsCommand.RaiseCanExecuteChanged();
             }
         }
         else
         {
-            await HandleMakeRequirementsAsync();
+            await HandleMakeRequirementsAsync(mode);
             OpenRequirementsCommand.RaiseCanExecuteChanged();
         }
     }
 
-    private async Task HandleMakeRequirementsAsync()
+    private async Task<int> HandleXMLParsing()
     {
+        var existedProtocols = new List<string>();
+        var contentFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "temp", "Requirements");
+        var parseXMLrequest = new ParseXMLRequest(DraftItem!.ActualPath!);
+        var parsingExitCode = await _cliMgr.ParseXMLAsync(parseXMLrequest, DraftItem!.ActualPath!);
+        if (parsingExitCode != 0)
+        {
+            _logger.Error("Parsing XML with parameters: {@Request} failed", parseXMLrequest);
+            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Parsing XML failed. The requirements process cannot continue"));
+        }
+        else
+        {
+            _logger.Information("Parsing XML with parameters: {@Request} succeded", parseXMLrequest);
+            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Parsing XML succeded! Press OK to continue the requirements process"));
+        }
+        return parsingExitCode;
+    }
+    private async Task HandleMakeRequirementsAsync(string mode)
+    {
+        _logger.Information($"Start handling requirements with in mode: {mode}");
         IsMakingRequirements = true;
-        string TarExtractFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "TempTarExtract");
-        ExtractTar(DraftItem!.ActualPath!, TarExtractFolder);
-        List<string> matchingProtocols = ExtractProtocolName(TarExtractFolder);
+
+        var contentFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "temp", "Requirements");
+        var existedProtocols = new List<string>();
+        switch (mode) {
+            case "GE":
+                ExtractTar(DraftItem!.ActualPath!, contentFolder);
+                existedProtocols = ExtractProtocolsNames(contentFolder);
+                break;
+            case "Siemens":
+                var parsingExitCode = await HandleXMLParsing();
+                if (parsingExitCode != 0)
+                {
+                    IsMakingRequirements = false;
+                    return;
+                }
+                existedProtocols = ReadProtocolsNames(contentFolder);
+                break;
+            }
+        
         var parameters = new DialogParameters
         {
-            { "items", matchingProtocols }
+            { "items", existedProtocols }
         };
 
 
@@ -658,7 +702,7 @@ class MainWindowViewModel : BindableBase
         if (result.Result == ButtonResult.OK)
         {
             var selectedProtocols = result.Parameters.GetValue<List<string>>("selectedItems");
-            MakeReqRequest request = new(DraftItem!.ActualPath!, selectedProtocols);
+            var request = new MakeReqRequest(DraftItem!.ActualPath!, selectedProtocols);
             var exitCode = await _cliMgr.MakeReqAsync(request, selectedProtocols);
             if (exitCode != 0)
             {
@@ -674,6 +718,21 @@ class MainWindowViewModel : BindableBase
 
         IsMakingRequirements = false;
 
+        /// <summary>
+        /// Reads protocols list, that is found in a txt file, out of a given folder.
+        /// </summary>
+        /// <param name="folderPath">The directory that contains that txt file.</param>
+        List<string> ReadProtocolsNames(string folderPath)
+        {
+            _logger.Information($"Reading protocols names from: {folderPath}...");
+            var txtFilepath = Directory.GetFiles(folderPath, "*.txt")[0];
+            var protocolsList = File.ReadAllText(txtFilepath)
+                   .Split(',')
+                   .Select(item => item.Trim())
+                   .ToList();
+            _logger.Information($"The protocols in file are: {string.Join(", ", protocolsList)}...");
+            return protocolsList;
+        }
         /// <summary>
         /// Extracts the contents of a tar file to a specified directory.
         /// </summary>
@@ -726,7 +785,7 @@ class MainWindowViewModel : BindableBase
         /// Extracts protocol name from a directory that contains tar content.
         /// </summary>
         /// <param name="directoryPath">The path of the directory that contains the protocols.</param>
-        List<string> ExtractProtocolName(string directoryPath)
+        List<string> ExtractProtocolsNames(string directoryPath)
         {
             _logger.Information($"Extracting protocols names from {directoryPath}.");
             // Regex pattern to match folder names
