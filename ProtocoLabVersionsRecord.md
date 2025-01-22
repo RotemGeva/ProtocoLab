@@ -29,3 +29,7 @@
 		SQAT-17 fix.
 1.0.5.2 -
 		Add remove_readonly function to extract_tar function, to remove read-only attribute if folder cannot be deleted.
+1.0.5.3 -
+		Uncheck checkbox after comparison ends.
+1.0.6.0 -
+	Support for making requirements for Siemens (using XML).
