@@ -20,128 +20,156 @@ class Requirements:
         logging.info(f'***** Make Requirement *****')
         try:
             self.parameters = parameters
-            #self.prepare_folders_for_make_req()
-            if 'ProtocolExtractor' not in os.listdir('Data'):
-                logging.info(f'Protocol Extractor tool not exist in {os.getcwd()}\\Data')
-                self.prepare_protocol_extractor_for_make_req()
-            logging.info(f'Creating requirements for: {parameters.mr_name}...')
             self.mr = parameters.mr_name
-            self.activate_protocol_extractor()
-            self.move_protocol_extractor_output()
-            self.excel_rearrangement(parameters)
+            self.mr_vendor = parameters.mr_vendor
+            logging.info(f'Creating requirements for: {self.mr}...')
+            self.remove_xlsx_files()
+            self.activate_protocol_extractor(self.mr_vendor)
+            self.process_protocol_extractor_file()
+            self.excel_rearrangement()
             logging.info(f'***** Make Requirement Done *****')
         except Exception as err:
             logging.error(f'Error during making requirements process: {err}.')
             sys.exit(1)
 
-    def prepare_folders_for_make_req(self):
-        logging.info(f'Start to create folders')
-        self.parameters.protocol_selection_list = []
-        for inside_tab_list_box in self.parameters.inside_tab_list_box_list:
-            temp_selection_list = []
-            for item in inside_tab_list_box.selection():
-                temp_selection_list.append(inside_tab_list_box.item(item, "text"))
-            self.parameters.protocol_selection_list.append(temp_selection_list)
+    def process_protocol_extractor_file(self):
+        """
+        Searches for protocol extractor output and handles it.
+        """
+        protocol_extractor_folder = os.path.join(os.getcwd(), 'Data', 'ProtocolExtractor')
+        requirements_folder = os.path.join(os.getcwd(), 'Data', 'Requirements')
+        logging.info('Searching for Protocol Extractor output...')
+        for file in os.listdir(protocol_extractor_folder):
+            if file.startswith('protocols_'):
+                self.process_file(file, protocol_extractor_folder, requirements_folder)
 
-        for i in range(0, self.parameters.number_of_mrs):
-            logging.info(
-                f'MR: {self.parameters.mrs_list[i]}, selected protocols: {self.parameters.protocol_selection_list[i]}')
-            try:
-                os.mkdir(f'Data\\{self.parameters.mrs_list[i]}')
-                logging.info(f'Folder named: {self.parameters.mrs_list[i]} created')
-            except FileExistsError:
-                logging.info(
-                    f'Folder with the name: {self.parameters.mrs_list[i]} already exists in {os.getcwd()}\\Data, please remove or rename it')
-                raise Exception(
-                    f'Folder with the name: {self.parameters.mrs_list[i]} already exists in {os.getcwd()}\\Data, please remove or rename it')
+    def process_file(self, file, protocol_extractor_folder, requirements_folder):
+        """
+        Copies input file to requirements folder and renames it.
+        :param file: Input file.
+        :param protocol_extractor_folder: The folder which Protocol Extractor is found in.
+        :param requirements_folder: The folder that contains all the prepared requirements.
+        """
+        src_file = os.path.join(protocol_extractor_folder, file)
+        dest_file = os.path.join(requirements_folder, file)
+        renamed_file = os.path.join(requirements_folder, f'{self.mr}_Requirements.xlsx')
 
-            for folder in self.parameters.protocol_selection_list[i]:
-                shutil.copytree(f'{os.getcwd()}\\Data\\temp\\MakeRequirement\\{self.parameters.mrs_list[i]}\\{folder}',
-                                f'Data\\{self.parameters.mrs_list[i]}\\{folder}')
-                logging.info(f'Copy protocol: {folder} to folder: {os.getcwd()}\\Data\\{self.parameters.mrs_list[i]}')
-
-    def prepare_protocol_extractor_for_make_req(self):
-        logging.info(f'Starting to move Protocol Extractor tool to {os.getcwd()}\\Data...')
         try:
-            temp_folder_list = os.listdir('\\\\192.100.100.116\\Public\\Testing\\Tools\\ProtocolExtractor\\bin\\V1.3')
-            logging.info(
-                f'Copying from: \\\\192.100.100.116\\Public\\Testing\\Tools\\ProtocolExtractor\\bin\\V1.3\\{temp_folder_list[len(temp_folder_list) - 1]}'
-                f'to: {os.getcwd()}\\Data\\ProtocolExtractor.')
-            shutil.copytree(
-                f'\\\\192.100.100.116\\Public\\Testing\\Tools\\ProtocolExtractor\\bin\\V1.3\\{temp_folder_list[len(temp_folder_list) - 1]}',
-                f'{os.getcwd()}\\Data\\ProtocolExtractor')
-            logging.info(f'Protocol Extractor tool moved to {os.getcwd()}\\Data successfully.')
+            # Copy file to requirements folder
+            logging.info(f'Copying: {src_file} to: {requirements_folder}...')
+            shutil.copy2(src_file, requirements_folder)
+            logging.info('File was copied successfully.')
+            # Rename file - adds underscore and the word Requirements.
+            self.rename_file(dest_file, renamed_file)
+        except FileExistsError:
+            logging.info(f'{renamed_file} already exists.')
+            self.handle_existing_file(renamed_file, dest_file)
+        except Exception as e:
+            logging.error(f'Failed to process file {file}: {e}')
+            raise Exception()
+
+    def handle_existing_file(self, existing_file, new_file):
+        """
+        Adds timestamp to existing requirements file and deletes it.
+        :param existing_file: Existing file.
+        :param new_file: The renamed file.
+        """
+        try:
+            # Add timestamp and remove the old file if needed
+            logging.info('Adding timestamp to file...')
+            Requirements.add_timestamp(existing_file)
+            logging.info('Removing old file...')
+            os.remove(existing_file)
+            # Rename the file
+            self.rename_file(new_file, existing_file)
         except Exception as err:
-            logging.info(f'Could not move Protocol Extractor tool to {os.getcwd()}\\Data.\nError: {err}.')
-            raise Exception(f'Could not move Protocol Extractor tool to {os.getcwd()}\\Data.\nError: {err}.')
+            logging.error(f'Failed to handle existing requirements file: {err}')
 
-    def activate_protocol_extractor(self):
-        # remove all xls files from extractor folder
-        logging.info(f'Removing all .xlsx files from Protocol Extractor folder...')
+    @staticmethod
+    def remove_xlsx_files():
+        """
+        Remove all xlsx files from protocol extractor folder.
+        """
         try:
-            list_of_xls_files = glob.glob(f'{os.getcwd()}\\Data\\ProtocolExtractor\\*.xlsx')
-            logging.info(f'Files found in ProtocolExtractor folder: {list_of_xls_files}.')
-            for xls_file in list_of_xls_files:
-                logging.info(f'Removing: {xls_file}...')
+            logging.info('Removing all .xlsx files from Protocol Extractor folder...')
+            protocol_extractor_folder = os.path.join(os.getcwd(), 'Data', 'ProtocolExtractor')
+            xls_files = glob.glob(f'{protocol_extractor_folder}\\*.xlsx')
+            logging.info(f'Files found in Protocol Extractor folder are: {xls_files}.')
+            for xls_file in xls_files:
                 os.remove(xls_file)
-                logging.info('File was removed successfully.')
-            logging.info(f'All .xlsx files were removed from Protocol Extractor folder.')
+            logging.info('All .xlsx files were removed from Protocol Extractor folder successfully.')
         except Exception as err:
-            logging.info(f'Failed to remove all .xlsx files from Protocol Extractor folder.\nError: {err}')
-            raise Exception(f'Failed to remove all .xlsx files from Protocol Extractor folder.\nError: {err}')
+            logging.info(f'Failed to remove {xls_file}.\nError: {err}')
+            raise Exception()
 
+    @staticmethod
+    def get_ge_files() -> tuple:
+        input_folder = os.path.join(os.getcwd(), 'Data', 'temp', 'Requirements')
+        field_map_filepath = os.path.join(os.getcwd(), 'Data', 'ProtocolExtractor', 'ge_fields_map.ini')
+        return input_folder, field_map_filepath
+
+    @staticmethod
+    def get_siemens_files() -> tuple:
+        input_folder = glob.glob(os.path.join(os.getcwd(), 'Data', 'temp', 'Requirements', "*.yaml"))[0]
+        field_map_filepath = os.path.join(os.getcwd(), 'Data', 'ProtocolExtractor', 'siemens_fields_map.ini')
+        return input_folder, field_map_filepath
+
+    @staticmethod
+    def execute_protocol_extractor(input_folder: str, field_map_filepath: str, mode: str) -> None:
+        """Runs the Protocol Extractor tool"""
+        protocol_extractor_folder = os.path.join(os.getcwd(), 'Data', 'ProtocolExtractor')
+        protocol_extractor_path = os.path.join(protocol_extractor_folder, 'ProtocolExtractor.exe')
+
+        match mode:
+            case 'GE':
+                flag = '-f'
+            case 'Siemens':
+                flag = '-t'
+        logging.info(
+            f'Running Protocol Extractor tool: {protocol_extractor_path} -t {input_folder} -m {field_map_filepath}')
+        subprocess.run(f'{protocol_extractor_path} {flag} {input_folder} -m {field_map_filepath}',
+                       cwd=protocol_extractor_folder)
+
+    @staticmethod
+    def activate_protocol_extractor(mode: str) -> None:
+        """
+        Activates Protocol Extractor tool, which outputs Excel file from a given tar/xml.
+        :param mode: GE or Siemens, according to MR vendor.
+        """
         try:
-            logging.info(
-                f'Running Protocol Extractor tool, command: {os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor'
-                f'.exe -f {os.getcwd()}\\Data\\TempTarExtract -m '
-                f'{os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini')
-            subprocess.run(
-                f'{os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor.exe -f {os.getcwd()}\\Data\\TempTarExtract -m {os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini',
-                cwd=f'{os.getcwd()}\\Data\\ProtocolExtractor')
+            match mode:
+                case 'GE':
+                    input_folder, field_map_filepath = Requirements.get_ge_files()
+                case 'Siemens':
+                    input_folder, field_map_filepath = Requirements.get_siemens_files()
+            Requirements.execute_protocol_extractor(input_folder, field_map_filepath, mode)
             logging.info(f'Protocol Extractor tool was executed successfully.')
         except Exception as err:
-            logging.info(f'Failed to run Protocol Extractor tool.\nError: {err}')
-            raise Exception(f'Failed to run Protocol Extractor tool.\nError: {err}')
+            logging.info(f'Failed to execute Protocol Extractor tool.\nError: {err}')
+            raise Exception()
 
-    def move_protocol_extractor_output(self):
-        for file in os.listdir(f'{os.getcwd()}\\Data\\ProtocolExtractor.'):
-            if file.startswith('protocols_'):
-                logging.info(f'Copying Protocol Extractor tool output...')
-                try:
-                    logging.info(f'Copying: {os.getcwd()}\\Data\\ProtocolExtractor\\{file} to: {os.getcwd()}\\Data'
-                                 f'\\Requirements...')
-                    shutil.copy2(f'{os.getcwd()}\\Data\\ProtocolExtractor\\{file}',
-                                 f'{os.getcwd()}\\Data\\Requirements')
-                    logging.info('File was copied successfully.')
-                except Exception as err:
-                    logging.info(f'Failed to move Protocol Extractor tool output.\nError: {err}')
-                    raise Exception(f'Failed to move Protocol Extractor tool output.\nError: {err}')
-                try:
-                    logging.info(f'Renaming: {os.getcwd()}\\Data\\Requirements\\{file} to: {os.getcwd()}\\Data'
-                                 f'\\Requirements\\{self.mr}_Requirements.xlsx...')
-                    os.rename(f'{os.getcwd()}\\Data\\Requirements\\{file}',
-                              f'{os.getcwd()}\\Data\\Requirements\\{self.mr}_Requirements.xlsx')
-                    logging.info(f'{file} renamed to {self.mr}_Requirements.xlsx')
-                except FileExistsError:
-                    try:
-                        logging.info(f'{os.getcwd()}\\Data\\Requirements\\{self.mr}_Requirements.xlsx already exists.')
-                        logging.info(
-                            f'Copying: {os.getcwd()}\\Data\\Requirements\\{self.mr}_Requirements.xlsx to: {os.getcwd()}\\Data\\Requirements\\{self.mr}_{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}_Requirements.xlsx...')
-                        shutil.copy2(src=f'{os.getcwd()}\\Data\\Requirements\\{self.mr}_Requirements.xlsx',
-                                     dst=f'{os.getcwd()}\\Data\\Requirements\\{self.mr}_Requirements_{datetime.now().strftime("%d-%m-%Y_%H-%M-%S")}.xlsx')
-                        logging.info(
-                            f'File copied successfully. Removing: {os.getcwd()}\\Data\\Requirements\\{self.mr}_Requirements.xlsx...')
-                        os.remove(f'{os.getcwd()}\\Data\\Requirements\\{self.mr}_Requirements.xlsx')
-                        logging.info('Removal was successful.')
-                        logging.info(f'Renaming: {os.getcwd()}\\Data\\Requirements\\{file} to: {os.getcwd()}\\Data'
-                                     f'\\Requirements\\{self.mr}_Requirements.xlsx...')
-                        os.rename(f'{os.getcwd()}\\Data\\Requirements\\{file}',
-                                  f'{os.getcwd()}\\Data\\Requirements\\{self.mr}_Requirements.xlsx')
-                        logging.info(f'{file} renamed to {self.mr}_Requirements.xlsx')
-                    except Exception as err:
-                        logging.error(f'Handling with identical requirements file was failed. {err}.')
+    @staticmethod
+    def add_timestamp(filepath) -> None:
+        """
+        Adds timestamp to a given file.
+        :param filepath: Filepath of the input file.
+        """
+        try:
+            logging.info(f'Adding timestamp to {filepath}...')
+            timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+            filepath_without_extension = os.path.splitext(filepath)[0]
+            shutil.copy2(src=filepath, dst=f'{filepath_without_extension}_{timestamp}.xlsx')
+            logging.info(f'Added timestamp successfully.')
+        except Exception as e:
+            logging.error(f'Failed to add timestamp. error: {e}')
 
-    def excel_rearrangement(self, parameters):
+    @staticmethod
+    def rename_file(file, renamed_file):
+        logging.info(f'Renaming: {file} to: {renamed_file}...')
+        os.rename(file, renamed_file)
+        logging.info('File was renamed successfully.')
+
+    def excel_rearrangement(self):
         logging.info(f'Working on {self.mr}_Requirements.xlsx...')
         try:
             logging.info(f'Opening {self.mr}_Requirements.xlsx using Python...')
@@ -152,10 +180,10 @@ class Requirements:
             raise Exception(f'Failed to open {self.mr}_Requirements.xlsx.\nError: {err}')
         # Got a list of all sheets in the file and drove it into a variable
         sheets = requirement_file.sheetnames
-        logging.info(f'Retried sheet names from {requirement_file}: {sheets}.')
+        logging.info(f'Retrieved the following sheets names: {sheets}.')
         # Deleting first sheet
         logging.info(
-            f'Removing 1st sheet from {self.mr}_Requirements.xlsx, sheet name: {requirement_file[f"{sheets[0]}"]}')
+            f'Removing 1st sheet from {self.mr}_Requirements.xlsx...')
         requirement_file.remove(requirement_file[f'{sheets[0]}'])
 
         # Deleting unwanted sheets
@@ -163,8 +191,8 @@ class Requirements:
             logging.info(f'The following sheets are found in file: {requirement_file.sheetnames}')
             for sheet in requirement_file.sheetnames:
                 logging.info(f'Checking if sheet {sheet} was selected...')
-                if sheet not in parameters.protocol_elements:
-                    logging.info(f'{sheet} was not found in {parameters.protocol_elements}. Deleting: {sheet}...')
+                if sheet not in self.parameters.protocols:
+                    logging.info(f'{sheet} was not found in {self.parameters.protocols}. Deleting: {sheet}...')
                     del requirement_file[sheet]
                     logging.info('Deleted sheet.')
         except Exception as err:
