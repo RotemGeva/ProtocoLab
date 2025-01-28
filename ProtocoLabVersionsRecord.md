@@ -33,3 +33,5 @@
 		Uncheck checkbox after comparison ends.
 1.0.6.0 -
 	Support for making requirements for Siemens (using XML).
+1.1.0.0 -
+	Support for comparison for Siemens.
