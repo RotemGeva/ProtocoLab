@@ -639,43 +639,26 @@ class MainWindowViewModel : BindableBase
 
             if (dr != null && dr.Result == ButtonResult.OK)
             {
-                await HandleMakeRequirementsAsync(mode);
+                await HandleMakeRequirementsAsync(mode!);
                 OpenRequirementsCommand.RaiseCanExecuteChanged();
             }
         }
         else
         {
-            await HandleMakeRequirementsAsync(mode);
+            await HandleMakeRequirementsAsync(mode!);
             OpenRequirementsCommand.RaiseCanExecuteChanged();
         }
     }
 
-    private async Task<int> HandleXMLParsing()
-    {
-        var existedProtocols = new List<string>();
-        var contentFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "temp", "Requirements");
-        var parseXMLrequest = new ParseXMLRequest(DraftItem!.ActualPath!);
-        var parsingExitCode = await _cliMgr.ParseXMLAsync(parseXMLrequest, DraftItem!.ActualPath!);
-        if (parsingExitCode != 0)
-        {
-            _logger.Error("Parsing XML with parameters: {@Request} failed", parseXMLrequest);
-            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Parsing XML failed. The requirements process cannot continue"));
-        }
-        else
-        {
-            _logger.Information("Parsing XML with parameters: {@Request} succeded", parseXMLrequest);
-            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Parsing XML succeded! Press OK to continue the requirements process"));
-        }
-        return parsingExitCode;
-    }
     private async Task HandleMakeRequirementsAsync(string mode)
     {
         _logger.Information($"Start handling requirements with in mode: {mode}");
         IsMakingRequirements = true;
 
-        var contentFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "temp", "Requirements");
+        var contentFolder = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "cli", "Data", "temp");
         var existedProtocols = new List<string>();
-        switch (mode) {
+        switch (mode)
+        {
             case "GE":
                 ExtractTar(DraftItem!.ActualPath!, contentFolder);
                 existedProtocols = ExtractProtocolsNames(contentFolder);
@@ -689,8 +672,8 @@ class MainWindowViewModel : BindableBase
                 }
                 existedProtocols = ReadProtocolsNames(contentFolder);
                 break;
-            }
-        
+        }
+
         var parameters = new DialogParameters
         {
             { "items", existedProtocols }
@@ -819,6 +802,25 @@ class MainWindowViewModel : BindableBase
             return matchingFolders;
         }
     }
+
+    private async Task<int> HandleXMLParsing()
+    {
+        var existedProtocols = new List<string>();
+        var parseXMLrequest = new ParseXMLRequest(DraftItem!.ActualPath!);
+        var parsingExitCode = await _cliMgr.ParseXMLAsync(parseXMLrequest, DraftItem!.ActualPath!);
+        if (parsingExitCode != 0)
+        {
+            _logger.Error("Parsing XML with parameters: {@Request} failed", parseXMLrequest);
+            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Parsing XML failed. The requirements process cannot continue"));
+        }
+        else
+        {
+            _logger.Information("Parsing XML with parameters: {@Request} succeded", parseXMLrequest);
+            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Parsing XML succeded! Press OK to continue the requirements process"));
+        }
+        return parsingExitCode;
+    }
+    
 
 
     private bool CanOpenRequirements()

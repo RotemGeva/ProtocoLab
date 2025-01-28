@@ -62,7 +62,7 @@ public static class CompareCliApi
         /// <returns></returns>
         public async Task<int> ParseXMLAsync(ParseXMLRequest request, string ActualDataPath, CancellationToken ct = default)
         {
-            var resultDir = Path.Combine(ExternalToolDataDir, "temp", "Requirements");
+            var resultDir = Path.Combine(ExternalToolDataDir, "temp");
             if (Directory.Exists(resultDir))
                 Directory.Delete(resultDir, true); 
             Directory.CreateDirectory(resultDir);
@@ -182,10 +182,6 @@ public static class CompareCliApi
 
         public string GetResultsPath(CompareRequest request) =>
                 Path.Combine(ExternalToolDataDir, request.MrType, $"{request.MrType}_Comparison.xlsx");
-
-        /*Path.ChangeExtension(
-                Path.Combine(CompareDataDir, request.MrType, $"{request.MrType}_Comparison"),
-                Path.GetExtension(request.RequirementsPath));*/
 
         public string GetFolderPath(CompareRequest request) =>
                 Path.Combine(ExternalToolDataDir, request.MrType);
