@@ -1,15 +1,14 @@
-from XMLParser import XMLParser
 import logging
 import os
 import shutil
 import stat
-import subprocess
-import glob
 import openpyxl
 import win32com.client
 import sys
 import tarfile
-from pathlib import Path
+
+from XMLParser import XMLParser
+import utils
 import re
 
 
@@ -31,16 +30,16 @@ class Compare:
         logging.info(f'***** Compare *****')
         try:
             self.parameters = parameters
-            self.mr_name = Path(self.parameters.path_for_req).name.replace('_Requirements.xlsx', '')
-            logging.info(f'MR: {self.mr_name}')
-            self.extract_tar()
-            self.move_relevant_protocols()
-            if 'ProtocolExtractor' not in os.listdir('Data'):
-                logging.info(f'Protocol Extractor tool does not exist in {os.getcwd()}\\Data.')
-                self.prepare_protocol_extractor_for_compare()
-            self.activate_protocol_extractor()
-            self.move_protocol_extractor_output()
-            self.prepare_for_comparison()
+            self.handle_extraction(self.parameters.mr_vendor)
+            if self.parameters.mr_vendor == 'GE':
+                self.handle_moving_protocols()
+                siemens_sw_type = None
+            elif self.parameters.mr_vendor == 'Siemens':
+                siemens_sw_type = utils.read_mr_sw_type()
+            utils.handle_protocol_extractor(self.parameters.mr_name, self.parameters.mr_vendor,
+                                            siemens_sw_type, is_comparing=True)
+            self.prepare_comparison_file()
+            self.activate_macros()
             self.compare()
             logging.info(f'***** Compare Done *****')
             sys.exit()
@@ -48,190 +47,72 @@ class Compare:
             logging.error(f'Error during comparison: {err}.')
             sys.exit(1)
 
-
-    def extract_tar(self):
-        # Reset temp\Compare folder
-        compare_folder_path = f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}'
-        if os.path.exists(compare_folder_path):
-            logging.info(f'The folder: {compare_folder_path} already exists. Deleting the folder...')
-            try:
-                shutil.rmtree(compare_folder_path, onerror=remove_readonly)
-                logging.info(f"Deleted {compare_folder_path} successfully. Creating new folder under the same path...")
-                os.mkdir(compare_folder_path)
-                logging.info(f'Successfully created a new folder: {compare_folder_path}')
-            except Exception as err:
-                logging.error(f'Failed to reset folder: {compare_folder_path}. error: {err}.')
-                raise Exception(f'Failed to reset folder: {compare_folder_path}. error: {err}.')
-
-        # Extracting TAR
-        try:
-            logging.info('Start to open TAR file...')
-            my_tar = tarfile.open(self.parameters.path_for_tar)
-        except Exception as err:
-            logging.info(f'Could not open TAR file.\nError: {err}.')
-            raise Exception(f'Could not open TAR file.\nError: {err}.')
-        try:
-            logging.info(f'Start to extract TAR file to: {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}...')
-            my_tar.extractall(f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}')
-            logging.info(f'TAR file was extracted successfully. Closing file.')
-            my_tar.close()
-        except Exception as err:
-            logging.info(
-                f'Could not extract TAR file to: {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}.\nError: {err}.')
-            raise Exception(
-                f'Could not extract TAR file to: {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}.\nError: {err}.')
-
-    def move_relevant_protocols(self):
-        logging.info(
-            f'Start moving only the relevant protocols to folder {os.path.dirname(self.parameters.path_for_req)}\\ForCompare...')
-        try:
-            logging.info(f'Try to open: {self.parameters.path_for_req}...')
-            requirement_file = openpyxl.load_workbook(self.parameters.path_for_req)
-        except Exception as err:
-            logging.info(f'Could not open Excel file.\nError: {err}.')
-            raise Exception(f'Could not open Excel file.\nError: {err}.')
-        try:
-            logging.info('Retrieving sheet names from file...')
-            list_of_all_sheets = requirement_file.sheetnames
-            logging.info(f'Retrieved the following sheets names: {list_of_all_sheets}.')
-        except Exception as err:
-            logging.info(f'Could not retrieve sheets name from Excel file.\nError: {err}.')
-            raise Exception(f'Could not receive sheets name from Excel file.\nError: {err}.')
-
-        # Get a list of all protocols found in the TAR file
-        list_of_all_protocols = os.listdir(f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}')
-        logging.info(
-            f'List of all extracted protocols in {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}: {list_of_all_protocols}')
-
-        if f'ForCompare' in os.listdir(f'{os.path.dirname(self.parameters.path_for_req)}'):
-            logging.info(f'ForCompare folder already exists in {os.path.dirname(self.parameters.path_for_req)}')
-            try:
-                logging.info(f'Trying to delete: {os.path.dirname(self.parameters.path_for_req)}\\ForCompare...')
-                shutil.rmtree(f'{os.path.dirname(self.parameters.path_for_req)}\\ForCompare')
-                logging.info('Successfully deleted the folder.')
-            except Exception as err:
-                logging.info(
-                    f'Could not delete ForCompare folder from {os.path.dirname(self.parameters.path_for_req)}.\nError: {err}.')
-                raise Exception(
-                    f'Could not delete ForCompare folder from {os.path.dirname(self.parameters.path_for_req)}.\nError: {err}.')
-
-        logging.info(
-            f'Start moving relevant protocols to: {os.path.dirname(self.parameters.path_for_req)}\\ForCompare...')
-        for sheet_name in list_of_all_sheets:
-            for protocol_name in list_of_all_protocols:
-                if sheet_name == re.match("^adult_other_(.+?)_\d+_\d+$", str(protocol_name)).group(1):
+    def move_protocols(self, src_folder, dest_folder, existed_protocols) -> None:
+        """
+        Moves specific protocols from src folder to dest folder, according to the protocols that
+        appear in requirements file.
+        :param src_folder: src folder.
+        :param dest_folder: dest folder.
+        :param existed_protocols: all protocols found in original file.
+        """
+        logging.info(f'Moving protocols from: {src_folder} to: {dest_folder}.\n Protocols in original file are: '
+                     f'{existed_protocols}')
+        protocols_in_req = self.get_sheetsnames(self.parameters.req_path)
+        logging.info(f'Protocols in requirements file are: {protocols_in_req}')
+        protocol_regex = "^adult_other_(.+?)_\d+_\d+$"
+        for protocol_in_req in protocols_in_req:
+            for protocol_in_file in existed_protocols:
+                if protocol_in_req == re.match(protocol_regex, str(protocol_in_file)).group(1):
                     try:
-                        logging.info(f'Copying: {os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}\\{protocol_name} '
-                                     f'to: {os.path.dirname(self.parameters.path_for_req)}\\ForCompare\\{protocol_name}...')
-                        shutil.copytree(f'{os.getcwd()}\\Data\\temp\\Compare\\{self.mr_name}\\{protocol_name}',
-                                        f'{os.path.dirname(self.parameters.path_for_req)}\\ForCompare\\{protocol_name}')
-                        logging.info('File was copied.')
-                    except Exception as err:
-                        logging.info(
-                            f'Failed to copy protocol folder {protocol_name} to {os.path.dirname(self.parameters.path_for_req)}\\ForCompare.\nError: {err}')
-                        raise Exception(
-                            f'Failed to copy protocol folder {protocol_name} to {os.path.dirname(self.parameters.path_for_req)}\\ForCompare.\nError: {err}')
-        logging.info(f'All relevant protocols for MR {self.mr_name} moved successfully.')
+                        protocol_filepath = os.path.join(src_folder, protocol_in_file)
+                        new_protocol_filepath = os.path.join(dest_folder, protocol_in_file)
+                        logging.info(f'Copying: {protocol_filepath} to: {new_protocol_filepath}...')
+                        shutil.copytree(protocol_filepath, new_protocol_filepath)
+                        logging.info('File was copied successfully.')
+                    except Exception as e:
+                        logging.error('Failed to copy file.')
+                        raise Exception(f'Failed to copy file. error: {e}')
+        logging.info(f'All relevant protocols were moved successfully.')
 
-    def prepare_protocol_extractor_for_compare(self):
-        logging.info(f'Starting to move Protocol Extractor tool to {os.getcwd()}\\Data...')
+    def handle_moving_protocols(self):
+        """
+        Handles all moving protocols process.
+        """
+        temp_folder_path = os.path.join(os.getcwd(), 'Data', 'temp')
+        requirements_dir = os.path.dirname(self.parameters.req_path)
+        for_compare_folder = os.path.join(requirements_dir, 'ForCompare')
+
+        if 'ForCompare' in os.listdir(requirements_dir):
+            logging.info(f'ForCompare folder already exists in {requirements_dir}')
+            self.manage_folder(for_compare_folder, recreate=False)
+
+        protocols_in_file = os.listdir(temp_folder_path)
+        self.move_protocols(src_folder=temp_folder_path, dest_folder=for_compare_folder,
+                            existed_protocols=protocols_in_file)
+
+    def prepare_comparison_file(self):
+        """
+        Prepares comparison file before comparing process:
+        Removes first sheet and modifies file name.
+        """
+        logging.info(f'Preparing comparison file...')
+        # File paths
+        base_path = os.path.join(os.getcwd(), 'Data', self.parameters.mr_name)
+        src_file = os.path.join(base_path, f'{self.parameters.mr_name}_Requirements.xlsx')
+        dest_file = os.path.join(base_path, f'{self.parameters.mr_name}_Comparison.xlsx')
+        for_compare_filepath = os.path.join(base_path, 'ForCompare', f'{self.parameters.mr_name}_ForCompare.xlsx')
         try:
-            temp_folder_list = os.listdir('\\\\192.100.100.116\\Public\\Testing\\Tools\\ProtocolExtractor\\bin\\V1.3')
-            logging.info(
-                f'Copying from: \\\\192.100.100.116\\Public\\Testing\\Tools\\ProtocolExtractor\\bin\\V1.3\\{temp_folder_list[len(temp_folder_list) - 1]}'
-                f'to: {os.getcwd()}\\Data\\ProtocolExtractor.')
-            shutil.copytree(
-                f'\\\\192.100.100.116\\Public\\Testing\\Tools\\ProtocolExtractor\\bin\\V1.3\\{temp_folder_list[len(temp_folder_list) - 1]}',
-                f'{os.getcwd()}\\Data\\ProtocolExtractor')
-            logging.info(f'Protocol Extractor tool moved to {os.getcwd()}\\Data successfully.')
-        except Exception as err:
-            logging.info(f'Could not move Protocol Extractor tool to {os.getcwd()}\\Data.\nError: {err}.')
-            raise Exception(f'Could not move Protocol Extractor tool to {os.getcwd()}\\Data.\nError: {err}.')
+            shutil.copy2(src_file, dest_file)
+            logging.info(f'Comparison file created at: {dest_file}')
+            wb = openpyxl.load_workbook(for_compare_filepath)
+            wb.remove(wb[wb.sheetnames[0]])
+            wb.save(for_compare_filepath)
+            logging.info(f'Removed first sheet and saved {for_compare_filepath}')
+        except Exception as e:
+            logging.error(f'Error during comparison file preparation: {e}')
+            raise Exception(f'Error during comparison file preparation: {e}')
 
-    def activate_protocol_extractor(self):
-        # remove all xls files from extractor folder
-        logging.info(f'Removing all .xlsx files from Protocol Extractor folder...')
-        try:
-            list_of_xls_files = glob.glob(f'{os.getcwd()}\\Data\\ProtocolExtractor\\*.xlsx')
-            logging.info(f'Files found in ProtocolExtractor folder: {list_of_xls_files}.')
-            for xls_file in list_of_xls_files:
-                logging.info(f'Removing: {xls_file}...')
-                os.remove(xls_file)
-                logging.info('File was removed successfully.')
-            logging.info(f'All .xlsx files were removed from ProtocolExtractor folder.')
-        except Exception as err:
-            logging.info(f'Failed to remove all .xlsx files from Protocol Extractor folder.\nError: {err}.')
-            raise Exception(f'Failed to remove all .xlsx files from Protocol Extractor folder.\nError: {err}.')
-        logging.info('Performing GE scenario...')
-        try:
-            logging.info(
-                f'Running Protocol Extractor tool, command: {os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor'
-                f'.exe'
-                f'-f {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare -m '
-                f'{os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini...')
-            subprocess.run(
-                f'{os.getcwd()}\\Data\\ProtocolExtractor\\ProtocolExtractor.exe -f {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare -m {os.getcwd()}\\Data\\ProtocolExtractor\\fields_map.ini',
-                cwd=f'{os.getcwd()}\\Data\\ProtocolExtractor')
-            logging.info(f'Protocol Extractor tool was executed successfully.')
-        except Exception as err:
-            logging.info(f'failed to run Protocol Extractor tool.\nError: {err}.')
-            raise Exception(f'failed to run Protocol Extractor tool.\nError: {err}.')
-
-
-
-    def move_protocol_extractor_output(self):
-        for file in os.listdir(f'{os.getcwd()}\\Data\\ProtocolExtractor'):
-            if file.startswith('protocols_'):
-                logging.info(f'Copying Protocol Extractor tool output...')
-                try:
-                    logging.info(
-                        f'Start to copy: {os.getcwd()}\\Data\\ProtocolExtractor\\{file} to: {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare...')
-                    shutil.copy2(f'{os.getcwd()}\\Data\\ProtocolExtractor\\{file}',
-                                 f'{os.getcwd()}\\Data\\{self.mr_name}\\ForCompare')
-                    logging.info('File copied successfully.')
-                except Exception as err:
-                    logging.info(f'Failed to move Protocol Extractor tool output.\nError: {err}.')
-                    raise Exception(f'Failed to move Protocol Extractor tool output.\nError: {err}.')
-                try:
-                    logging.info(
-                        f'Try to rename: {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{file} to: {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{self.mr_name}_ForCompare.xlsx')
-                    os.rename(f'{os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{file}',
-                              f'{os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{self.mr_name}_ForCompare.xlsx')
-                    logging.info('Renaming succeeded.')
-                except Exception as err:
-                    logging.info(f'Failed to rename Protocol Extractor tool output.\nError: {err}.')
-                    raise Exception(f'Failed to rename Protocol Extractor tool output.\nError: {err}.')
-
-    def prepare_for_comparison(self):
-        logging.info(f'Preparing for comparison...')
-        try:
-            logging.info(
-                f'Creating comparison file: copying {self.mr_name}_Requirements.xlsx and saving as {self.mr_name}_Comparison'
-                f'.xlsx')
-            shutil.copy2(f'{os.getcwd()}\\Data\\{self.mr_name}\\{self.mr_name}_Requirements.xlsx',
-                         f'{os.getcwd()}\\Data\\{self.mr_name}\\{self.mr_name}_Comparison.xlsx')
-        except Exception as err:
-            logging.info(f'Failed to copy {self.mr_name}_Requirements.xlsx file.\nError: {err}.')
-            raise Exception(f'Failed to copy {self.mr_name}_Requirements.xlsx file.\nError: {err}.')
-        try:
-            logging.info(f'Opening {self.mr_name}_ForCompare.xlsx using Python...')
-            for_compare_file = openpyxl.load_workbook(
-                f'{os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{self.mr_name}_ForCompare.xlsx')
-        except Exception as err:
-            logging.info(f'Failed to open {self.mr_name}_ForCompare.xlsx.\nError: {err}.')
-            raise Exception(f'Failed to open {self.mr_name}_ForCompare.xlsx.\nError: {err}.')
-        # Got a list of all sheets in the file and drove it into a variable
-        sheets = for_compare_file.sheetnames
-        logging.info(f'Sheets names in file: {for_compare_file} are: {sheets}.')
-        # Deleting first sheet
-        logging.info(
-            f'Removing 1st sheet from {self.mr_name}_ForCompare.xlsx, sheet name: {for_compare_file[f"{sheets[0]}"]}...')
-        for_compare_file.remove(for_compare_file[f'{sheets[0]}'])
-        # Saved file with changes (deleted page)
-        for_compare_file.save(f'{os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{self.mr_name}_ForCompare.xlsx')
-        logging.info(f'Sheet removed and file {self.mr_name}_ForCompare.xlsx saved')
-
-        # macros
+    def activate_macros(self):
         try:
             logging.info('Opening Excel...')
             excel = win32com.client.dynamic.Dispatch('Excel.Application')
@@ -248,12 +129,13 @@ class Compare:
             raise Exception(f'Failed to open macro excel file: {self.parameters.macro_excel_file}.\nError: {err}')
         # open the file to run macros on
         try:
-            logging.info(f'Opening {self.mr_name}_ForCompare.xlsx for macros...')
+            logging.info(f'Opening {self.parameters.mr_name}_ForCompare.xlsx for macros...')
             for_compare_file = excel.workbooks.Open(
-                Filename=f'{os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{self.mr_name}_ForCompare.xlsx')
+                Filename=f'{os.getcwd()}\\Data\\{self.parameters.mr_name}\\ForCompare\\{self.parameters.mr_name}_ForCompare.xlsx')
         except Exception as err:
-            logging.info(f'Failed to open excel file: {self.mr_name}_ForCompare.\nError: {err}')
-            raise Exception(f'Failed to open macro excel file: {self.mr_name}_ForCompare.xlsx.\nError: {err}')
+            logging.info(f'Failed to open excel file: {self.parameters.mr_name}_ForCompare.\nError: {err}')
+            raise Exception(
+                f'Failed to open macro excel file: {self.parameters.mr_name}_ForCompare.xlsx.\nError: {err}')
         # run macro
         try:
             logging.info(f'Running macro: EqualCellSizeForAllSheets...')
@@ -271,12 +153,13 @@ class Compare:
             raise Exception(f'Failed to run macro: CenterForAllSheets.\nError: {err}.')
         # save the file after macros
         try:
-            logging.info(f'Saving: {os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{self.mr_name}_ForCompare.xlsx...')
+            logging.info(
+                f'Saving: {os.getcwd()}\\Data\\{self.parameters.mr_name}\\ForCompare\\{self.parameters.mr_name}_ForCompare.xlsx...')
             for_compare_file.Close(SaveChanges=1)
             logging.info('File was saved successfully. Quitting excel.')
         except Exception as err:
-            logging.info(f'Failed to save {self.mr_name}_ForCompare.xlsx.\nError: {err}.')
-            raise Exception(f'Failed to save {self.mr_name}_ForCompare.xlsx.\nError: {err}.')
+            logging.info(f'Failed to save {self.parameters.mr_name}_ForCompare.xlsx.\nError: {err}.')
+            raise Exception(f'Failed to save {self.parameters.mr_name}_ForCompare.xlsx.\nError: {err}.')
         excel.Quit()
 
     def compare(self):
@@ -296,12 +179,13 @@ class Compare:
             raise Exception(f'Failed to open macro excel file: {self.parameters.macro_excel_file}.\nError: {err}.')
         # open the file to run macros on
         try:
-            logging.info(f'Opening {self.mr_name}_Comparison.xlsx to run macros on...')
+            logging.info(f'Opening {self.parameters.mr_name}_Comparison.xlsx to run macros on...')
             comparison_file = excel.workbooks.Open(
-                Filename=f'{os.getcwd()}\\Data\\{self.mr_name}\\{self.mr_name}_Comparison.xlsx')
+                Filename=f'{os.getcwd()}\\Data\\{self.parameters.mr_name}\\{self.parameters.mr_name}_Comparison.xlsx')
         except Exception as err:
-            logging.info(f'Failed to open excel file: {self.mr_name}_Comparison.\nError: {err}.')
-            raise Exception(f'Failed to open macro excel file: {self.mr_name}_Comparison.xlsx.\nError: {err}.')
+            logging.info(f'Failed to open excel file: {self.parameters.mr_name}_Comparison.\nError: {err}.')
+            raise Exception(
+                f'Failed to open macro excel file: {self.parameters.mr_name}_Comparison.xlsx.\nError: {err}.')
         # run macro
         try:
             logging.info(f'Running macro: ReqToTestDocForAllSheets...')
@@ -313,8 +197,8 @@ class Compare:
         try:
             logging.info(f'Running macro: PythonAutomaticCopyPasteToAllSheets...')
             excel.Run(f"'{self.parameters.macro_excel_file}'!PythonAutomaticCopyPasteToAllSheets",
-                      str(f'{os.getcwd()}\\Data\\{self.mr_name}\\ForCompare\\{self.mr_name}_ForCompare.xlsx'),
-                      str(f'{os.getcwd()}\\Data\\{self.mr_name}\\{self.mr_name}_Comparison.xlsx'))
+                      str(f'{os.getcwd()}\\Data\\{self.parameters.mr_name}\\ForCompare\\{self.parameters.mr_name}_ForCompare.xlsx'),
+                      str(f'{os.getcwd()}\\Data\\{self.parameters.mr_name}\\{self.parameters.mr_name}_Comparison.xlsx'))
             logging.info(f'Running macro PythonAutomaticCopyPasteToAllSheets ended successfully.')
         except Exception as err:
             logging.info(f'Failed to run macro: PythonAutomaticCopyPasteToAllSheets.\nError: {err}.')
@@ -329,10 +213,82 @@ class Compare:
 
         # save the file after macros
         try:
-            logging.info(f'Saving {self.mr_name}_Comparison.xlsx...')
+            logging.info(f'Saving {self.parameters.mr_name}_Comparison.xlsx...')
             comparison_file.Close(SaveChanges=1)
             logging.info('File was saved. Quitting Excel.')
             excel.Quit()
         except Exception as err:
-            logging.info(f'Failed to save {self.mr_name}_Comparison.xlsx.\nError: {err}')
-            raise Exception(f'Failed to save {self.mr_name}_Comparison.xlsx.\nError: {err}')
+            logging.info(f'Failed to save {self.parameters.mr_name}_Comparison.xlsx.\nError: {err}')
+            raise Exception(f'Failed to save {self.parameters.mr_name}_Comparison.xlsx.\nError: {err}')
+
+    def handle_extraction(self, mode: str) -> None:
+        """
+        Handles all extraction process.
+        tar for GE scenario and convertion of xml to yaml for Siemens scenario.
+        """
+        dest_folder = os.path.join(os.getcwd(), 'Data', 'temp')
+        if os.path.exists(dest_folder):
+            logging.info(f'The folder: {dest_folder} already exists.')
+            self.manage_folder(dest_folder, recreate=True)
+        match mode.lower():
+            case 'ge':
+                self.extract_tar(filepath=self.parameters.actual_path, dest_folder_path=dest_folder)
+            case 'siemens':
+                XMLParser.parse(self.parameters.actual_path, self.parameters.mr_name)
+
+    @staticmethod
+    def manage_folder(folder_path: str, recreate: bool = True) -> None:
+        """
+        Deletes folder and re-creates it.
+        :param recreate: True recreates the folder. False only deletes the folder.
+        :param folder_path: The folder to delete and re-create.
+        """
+        logging.info(f'Managing folder: {folder_path} with recreate: {recreate}...')
+        try:
+            shutil.rmtree(folder_path, onerror=remove_readonly)
+            logging.info(f"Deleted {folder_path} successfully.")
+            if recreate:
+                logging.info(f"Re-creating folder: {folder_path}...")
+                os.mkdir(folder_path)
+                logging.info(f'Successfully created a new folder: {folder_path}')
+            else:
+                logging.info(f"Folder {folder_path} was deleted, but not re-created.")
+        except Exception as err:
+            logging.error(f'Failed to delete and re-create folder: {folder_path}. error: {err}.')
+            raise Exception(f'Failed to delete and re-create folder: {folder_path}. error: {err}.')
+
+    @staticmethod
+    def extract_tar(filepath: str, dest_folder_path: str) -> None:
+        """
+        Extracts tar content from a given folder to a destination folder.
+        :param filepath: The file to extract.
+        :param dest_folder_path: The folder that will contain the content.
+        """
+        try:
+            logging.info(f'Opening the tar file from: {filepath}...')
+            tar = tarfile.open(filepath)
+            logging.info(f'Extracting tar content to: {dest_folder_path}...')
+            tar.extractall(dest_folder_path)
+            logging.info('Tar file was extracted successfully. Closing file...')
+            tar.close()
+        except Exception as e:
+            logging.error(f'Failed to extract tar: {filepath}. error: {e}')
+            raise Exception(f'Failed to extract tar: {filepath}. error: {e}')
+
+    @staticmethod
+    def get_sheetsnames(filepath) -> list[str]:
+        """
+        Retrieves sheets names from a given Excel files.
+        :param filepath: Excel file.
+        """
+        logging.info(f'Retrieving sheets names from: {filepath}...')
+        try:
+            logging.info(f'Opening: {filepath}...')
+            file = openpyxl.load_workbook(filepath)
+            logging.info('Retrieving sheets names...')
+            sheet_names = file.sheetnames
+            logging.info(f'Retrieved the following sheets names: {sheet_names}.')
+            return sheet_names
+        except Exception as e:
+            logging.error(f'Could not retrieve sheets names from: {filepath}. error: {e}')
+            raise Exception(f'Could not retrieve sheets names from: {filepath}. error: {e}')

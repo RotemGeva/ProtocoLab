@@ -57,17 +57,17 @@ class XMLParser:
         logging.info(f'Found {len(protocols)} protocols within the whole file...')
         return protocols
 
-    def output_all_protocol_names(self, mr_name, output_path='Data\\temp\\Requirements') -> None:
+    def output_all_protocol_names(self, output_path='Data\\temp') -> None:
         """
-        Finds all protocol title elements that are found under "program" tag.
-        :return: A list of all the protocol title elements.
+        Finds all protocol title elements that are found under "program" tag, and output the protocol names
+        to an external file.
         """
         logging.info(f'Outputting all protocols names...')
         protocols: list[str] = []
         for protocol in self.root.iter('program'):
             protocols.append(protocol.get('name'))
         try:
-            with open(f'{output_path}\\protocols_list-{mr_name}.txt', 'w') as file:
+            with open(f'{output_path}\\protocols_list.txt', 'w') as file:
                 file.write(str(protocols)[1:-1].replace("'", "") + "\n")
         except Exception as e:
             logging.error(f'Failed to export protocols names. error: {e}')
@@ -175,16 +175,15 @@ class XMLParser:
                                                  sequences_names_for_protocol)]
             for index, sequence_element in enumerate(sequence_elements_for_protocol):
                 sequence_name = xml_handler.get_sequence_name(sequence_element)
-                if '*' not in sequence_name:
-                    sequence = Sequence(sequence_name)
-                    xml_handler.fill_in_parameters(sequence_element, sequence)
-                    current_protocol.add_sequence(sequence)
+                sequence = Sequence(sequence_name)
+                xml_handler.fill_in_parameters(sequence_element, sequence)
+                current_protocol.add_sequence(sequence)
             print_protocol_index += len(sequences_names_for_protocol)
             protocols_list.append(current_protocol)
         return protocols_list
 
     @staticmethod
-    def parse(xml_filepath, mr_name, output_path='Data\\temp\\Requirements'):
+    def parse(xml_filepath, mr_name, output_path='Data\\temp'):
         """
         Handles all xml parsing in high level.
         :param xml_filepath: Filepath of the xml file.
@@ -277,7 +276,10 @@ class XMLParser:
         return None
 
 
+
+
 if __name__ == '__main__':
     parse = XMLParser('VA50_LUMINA.xml')
     sequences = parse.get_all_sequence_elements()
     XMLParser.get_scan_time(sequences[0])
+

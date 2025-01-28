@@ -26,7 +26,7 @@ def create_log_file(name: str, existed_log_file=None):
         log_name = f'{name}_{data_and_time}.log'
         logging.basicConfig(filemode='w', filename=os.path.join(log_folder_path, log_name),
                             format='%(asctime)s.%(msecs)03d %(levelname)-8s %(module)s  %('
-                                   'funcName)-32s'
+                                   'funcName)-32s   '
                                    '%(message)s', datefmt='%d-%m-%Y %H:%M:%S',
                             level=logging.INFO)
     else:
@@ -71,18 +71,18 @@ match args.function:
     case 'c':  # Compare
         mr_name = Path(args.req_path).name.replace('_Requirements.xlsx', '')
         create_log_file(name="Compare-" + mr_name)
-        parameters = ApplicationParameters(args.req_path, args.actual_path, mr_name)
+        parameters = ApplicationParameters(mr_name=mr_name, actual_path=args.actual_path, req_path=args.req_path)
         logging.info(f'Compare request with parameters: {parameters.__str__()}.')
         Compare(parameters)
     case 'r':  # Create requirements
         mr_name = os.path.splitext(os.path.basename(args.actual_path))[0]
         create_log_file(name="Requirements-" + mr_name)
-        parameters = ApplicationParameters(args.req_path, args.actual_path, mr_name, args.protocols)
+        parameters = ApplicationParameters(mr_name=mr_name, actual_path=args.actual_path, protocols=args.protocols)
         logging.info(f'Making requirements request with parameters: {parameters.__str__()}.')
         Requirements(parameters)
     case 'x':  # Parse XML
         mr_name = os.path.splitext(os.path.basename(args.actual_path))[0]
         create_log_file(name="Parsing XML-" + mr_name)
         xml_object = XMLParser(args.actual_path)
-        xml_object.output_all_protocol_names(mr_name)
+        xml_object.output_all_protocol_names()
         xml_object.parse(args.actual_path, mr_name)
