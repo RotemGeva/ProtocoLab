@@ -546,7 +546,7 @@ class MainWindowViewModel : BindableBase
         {
             FileName = "File to Compare",
             DefaultExt = ".tar",
-            Filter = "(.tar)|*.tar|(.xml)|*.xml|All files (*.*)|*.*"
+            Filter = "Tar or XML files (*.tar;*.xml)|*.tar;*.xml|All files (*.*)|*.*"
         };
         bool? result = dialog.ShowDialog();
         if (result == true)
@@ -934,13 +934,13 @@ class MainWindowViewModel : BindableBase
                 isValid = false;
                 _logger.Error("Requirements file path: {ReqPath} is invalid [line: {Index}].", record.ReqPath, index + 1);
             }
-            if (!Path.Exists(record.ActualPath) || Path.GetExtension(record.ActualPath) != ".tar")
+            if (!Path.Exists(record.ActualPath) && (Path.GetExtension(record.ActualPath) != ".tar" || Path.GetExtension(record.ActualPath) != ".xml"))
             {
                 isValid = false;
                 _logger.Error("Actual file path: {ActualPath} is invalid [line: {Index}].", record.ActualPath, index + 1);
             }
         }
-        _logger.Information($"Input file validation mode: {isValid}.");
+        _logger.Information($"Input file validation result: {isValid}.");
         return isValid;
     }
 

@@ -32,6 +32,8 @@ namespace ProtocoLab
 
         public DelegateCommand SelectAllCommand { get; private set; }
 
+        public DelegateCommand UnselectAllCommand { get; private set; }
+
         public SelectionDialogViewModel()
         {
             Title = "Protocols Selection";
@@ -40,6 +42,7 @@ namespace ProtocoLab
             ConfirmCommand = new DelegateCommand(ConfirmDialog, CanConfirmDialog);
             CancelCommand = new DelegateCommand(CancelDialog);
             SelectAllCommand = new DelegateCommand(SelectAll);
+            UnselectAllCommand = new DelegateCommand(UnselectAll);
         }
 
 
@@ -109,6 +112,12 @@ namespace ProtocoLab
         {
             foreach(var item in  _protocols)
                 item.IsSelected = true;
+        }
+
+        private void UnselectAll()
+        {
+            foreach (var item in _protocols)
+                item.IsSelected = false;
         }
     }
 

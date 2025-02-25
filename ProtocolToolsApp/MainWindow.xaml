@@ -8,7 +8,7 @@
         prism:ViewModelLocator.AutoWireViewModel="True"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance local:MainWindowViewModel}"
-        Title="ProtocoLab - 1.1.0.0" Height="800" Width="1200">
+        Title="ProtocoLab - 1.1.1.0" Height="800" Width="1200">
 
   <Grid Name="Grid">
     <Grid.RowDefinitions>
@@ -49,7 +49,7 @@
     <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" Grid.ColumnSpan="2">
       <!--#region Actual -->
       <StackPanel Name="ActualInfo" Grid.Column="0" Grid.Row="1" Orientation="Vertical" HorizontalAlignment="Left" Grid.ColumnSpan="2" Margin="5">
-        <TextBlock Text="Enter protocol filepath (e.g. tar)" Grid.Row="2" Grid.ColumnSpan="2" FontSize="20" FontWeight="Bold"/>
+        <TextBlock Text="Enter protocol filepath" Grid.Row="2" Grid.ColumnSpan="2" FontSize="20" FontWeight="Bold"/>
         <TextBox Grid.Row="2" Name="TarEntry"  Width="400" Height="20" HorizontalAlignment="Left" FontSize="15"
         Text="{Binding DraftItem.ActualPath}"/>
       </StackPanel>
