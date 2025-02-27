@@ -380,6 +380,7 @@ class MainWindowViewModel : BindableBase
             _logger.Information($"Restarting execution status for: {item.MrType}.");
             item.ExecutionStatus = "";
         }
+
         bool isSuccess = true;
         foreach (CompareItem item in itemsToCompare)
         {
@@ -625,6 +626,7 @@ class MainWindowViewModel : BindableBase
         _logger.Information("User requested to make requirements.");
         Process[] pname = Process.GetProcessesByName("EXCEL");
         var fileExtension = Path.GetExtension(DraftItem!.ActualPath);
+
         var mode = fileExtension switch
         {
             ".tar" => "GE",

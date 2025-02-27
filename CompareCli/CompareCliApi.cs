@@ -124,7 +124,7 @@ public static class CompareCliApi
 
             var reqFileName = $"{request.MrType}_Requirements.xlsx";
             var reqFilePath = Path.Combine(resultDir, reqFileName);
-
+            
             File.Copy(request.RequirementsPath, reqFilePath);
 
             ProcessStartInfo startInfo = new()
