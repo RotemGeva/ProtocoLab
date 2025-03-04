@@ -35,3 +35,9 @@
 	Support for making requirements for Siemens (using XML).
 1.1.0.0 -
 	Support for comparison for Siemens.
+1.1.1.0 -
+	Support for XML in input file.
+	Defect fix: SQAT-43, SQAT40.
+	Support for multiple file types when selecting file from button.
+	Add button "Unselect All" in selection dialog.
+	Enhanced performance for Siemens scenario.

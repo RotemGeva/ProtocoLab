@@ -688,6 +688,7 @@ class MainWindowViewModel : BindableBase
         {
             var selectedProtocols = result.Parameters.GetValue<List<string>>("selectedItems");
             var request = new MakeReqRequest(DraftItem!.ActualPath!, selectedProtocols);
+            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Creating a requirements file from the selected protocols"));
             var exitCode = await _cliMgr.MakeReqAsync(request, selectedProtocols);
             if (exitCode != 0)
             {
