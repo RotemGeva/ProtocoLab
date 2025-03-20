@@ -297,7 +297,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanCompareAsync() =>
-        HasSelectedItems && !IsComparing;
+        HasSelectedItems && !IsComparing && !IsMakingRequirements;
 
     private async Task CompareAsync()
     {
@@ -327,7 +327,7 @@ class MainWindowViewModel : BindableBase
         await HandleCompareAllAsync(selectedOnly: true);
     }
     private bool CanCompareAllAsync() =>
-        HasItems && !IsComparing;
+        HasItems && !IsComparing && !IsMakingRequirements;
 
 
     private async Task CompareAllAsync()
@@ -441,7 +441,7 @@ class MainWindowViewModel : BindableBase
         }
     }
 
-    private bool CanInterruptComparison() => IsComparing;
+    private bool CanInterruptComparison() => IsComparing && !IsMakingRequirements;
 
     private void InterruptComparison()
     {
@@ -453,7 +453,7 @@ class MainWindowViewModel : BindableBase
 
 
     private bool CanOpenResult() =>
-        CompareRequest != null && File.Exists(_cliMgr.GetResultsPath(CompareRequest)) && !IsComparing;
+        CompareRequest != null && File.Exists(_cliMgr.GetResultsPath(CompareRequest)) && !IsComparing && !IsMakingRequirements;
 
 
     private void OpenResult()
@@ -469,7 +469,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanOpenFolder() =>
-        CompareRequest != null && Directory.Exists(_cliMgr.GetFolderPath(CompareRequest)) && !IsComparing;
+        CompareRequest != null && Directory.Exists(_cliMgr.GetFolderPath(CompareRequest)) && !IsComparing && !IsMakingRequirements;
 
 
     private void OpenFolder()
@@ -486,7 +486,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanDeleteItem() =>
-        SelectedItem != null && !IsComparing;
+        SelectedItem != null && !IsComparing && !IsMakingRequirements;
 
     private void DeleteItem()
     {
@@ -497,7 +497,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanDeleteAllItems() =>
-        HasItems && !IsComparing;
+        HasItems && !IsComparing && !IsMakingRequirements;
 
     private void DeleteAllItems()
     {
