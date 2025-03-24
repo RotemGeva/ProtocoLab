@@ -414,6 +414,7 @@ class MainWindowViewModel : BindableBase
             {
                 _logger.Information("The comparison process was interrupted.");
                 IsComparing = false;
+                IsComparisonInterrupted = false;
                 return;
             }
         }
