@@ -384,38 +384,37 @@ class MainWindowViewModel : BindableBase
         bool isSuccess = true;
         foreach (CompareItem item in itemsToCompare)
         {
-            if (!IsComparisonInterrupted) {
-                CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
-                try
-                {
-                    item.ExecutionStatus = "Running...";
-                    var exitCode = await _cliMgr.CompareAsync(request);
-                    if (exitCode != 0)
-                    {
-                        isSuccess = false;
-                        item.ExecutionStatus = "Failed";
-                        _logger.Error("Compare with parameters: {@Request} failed", request);
-                    }
-                    else
-                    {
-                        item.ExecutionStatus = "Succeeded";
-                        _logger.Information("Compare with parameters: {@Request} succeded", request);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
-                    item.ExecutionStatus = "Failed";
-                    _logger.Error(ex, "Compare tool failed to execute");
-                }
-            }
-
-            else
+            if (IsComparisonInterrupted)
             {
-                _logger.Information("The comparison process was interrupted.");
+                _logger.Information($"Run: {item.MrType} will not be executed.");
                 IsComparing = false;
                 IsComparisonInterrupted = false;
-                return;
+                break;
+            }
+
+            try
+            {
+                item.ExecutionStatus = "Running...";
+                var request = new CompareRequest(item.MrType!, item.ReqPath!, item.ActualPath!);
+                var exitCode = await _cliMgr.CompareAsync(request);
+
+                if (exitCode != 0)
+                {
+                    isSuccess = false;
+                    item.ExecutionStatus = "Failed";
+                    _logger.Error("Compare with parameters: {@Request} failed", request);
+                }
+                else
+                {
+                    item.ExecutionStatus = "Succeeded";
+                    _logger.Information("Compare with parameters: {@Request} succeeded", request);
+                }
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
+                item.ExecutionStatus = "Failed";
+                _logger.Error(ex, "Compare tool failed to execute");
             }
         }
         if (isSuccess)
@@ -423,6 +422,7 @@ class MainWindowViewModel : BindableBase
         else
             _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process terminated with errors. Check log"));
         IsComparing = false;
+        IsComparisonInterrupted = false;
         IsModifyComparisonSummaryChecked = false;
         OpenLatestLogCommand.RaiseCanExecuteChanged();
 
@@ -448,8 +448,10 @@ class MainWindowViewModel : BindableBase
     {
         if (!CanInterruptComparison()) return;
         IsComparisonInterrupted = true;
-        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process was interrupted and " +
-            "will end after the current run."));
+        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process was interrupted."));
+        killProcess("ExternalTool");
+        killProcess("EXCEL");
+        static void killProcess(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
     }
 
 
