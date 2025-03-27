@@ -14,9 +14,10 @@
     </Grid.RowDefinitions>
 
     <TextBlock Text="{Binding Title}" FontSize="18" Margin="10"/>
+    <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" Grid.Row="0" Height="20" Background="WhiteSmoke"/>
 
     <ListView Grid.Row="1" 
-                  ItemsSource="{Binding Protocols}">
+                  ItemsSource="{Binding FilteredProtocols}">
       <ListView.ItemTemplate>
         <DataTemplate>
           <CheckBox Content="{Binding Name}" 
@@ -27,6 +28,7 @@
 
     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
       <Button Content="Select All" Command="{Binding SelectAllCommand}" Margin="0,0,10,0"/>
+      <Button Content="Unselect All" Command="{Binding UnselectAllCommand}" Margin="0,0,10,0"/>
       <Button Content="Confirm" Command="{Binding ConfirmCommand}" Margin="0,0,10,0"/>
       <Button Content="Cancel" Command="{Binding CancelCommand}"/>
     </StackPanel>

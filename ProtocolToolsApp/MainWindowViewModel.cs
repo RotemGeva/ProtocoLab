@@ -297,7 +297,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanCompareAsync() =>
-        HasSelectedItems && !IsComparing;
+        HasSelectedItems && !IsComparing && !IsMakingRequirements;
 
     private async Task CompareAsync()
     {
@@ -327,7 +327,7 @@ class MainWindowViewModel : BindableBase
         await HandleCompareAllAsync(selectedOnly: true);
     }
     private bool CanCompareAllAsync() =>
-        HasItems && !IsComparing;
+        HasItems && !IsComparing && !IsMakingRequirements;
 
 
     private async Task CompareAllAsync()
@@ -380,40 +380,41 @@ class MainWindowViewModel : BindableBase
             _logger.Information($"Restarting execution status for: {item.MrType}.");
             item.ExecutionStatus = "";
         }
+
         bool isSuccess = true;
         foreach (CompareItem item in itemsToCompare)
         {
-            if (!IsComparisonInterrupted) {
-                CompareRequest request = new(item.MrType!, item.ReqPath!, item.ActualPath!);
-                try
-                {
-                    item.ExecutionStatus = "Running...";
-                    var exitCode = await _cliMgr.CompareAsync(request);
-                    if (exitCode != 0)
-                    {
-                        isSuccess = false;
-                        item.ExecutionStatus = "Failed";
-                        _logger.Error("Compare with parameters: {@Request} failed", request);
-                    }
-                    else
-                    {
-                        item.ExecutionStatus = "Succeeded";
-                        _logger.Information("Compare with parameters: {@Request} succeded", request);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
-                    item.ExecutionStatus = "Failed";
-                    _logger.Error(ex, "Compare tool failed to execute");
-                }
+            if (IsComparisonInterrupted)
+            {
+                _logger.Information($"Run: {item.MrType} will not be executed.");
+                IsComparing = false;
+                IsComparisonInterrupted = false;
+                break;
             }
 
-            else
+            try
             {
-                _logger.Information("The comparison process was interrupted.");
-                IsComparing = false;
-                return;
+                item.ExecutionStatus = "Running...";
+                var request = new CompareRequest(item.MrType!, item.ReqPath!, item.ActualPath!);
+                var exitCode = await _cliMgr.CompareAsync(request);
+
+                if (exitCode != 0)
+                {
+                    isSuccess = false;
+                    item.ExecutionStatus = "Failed";
+                    _logger.Error("Compare with parameters: {@Request} failed", request);
+                }
+                else
+                {
+                    item.ExecutionStatus = "Succeeded";
+                    _logger.Information("Compare with parameters: {@Request} succeeded", request);
+                }
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=Compare tool failed to execute!"));
+                item.ExecutionStatus = "Failed";
+                _logger.Error(ex, "Compare tool failed to execute");
             }
         }
         if (isSuccess)
@@ -421,6 +422,7 @@ class MainWindowViewModel : BindableBase
         else
             _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process terminated with errors. Check log"));
         IsComparing = false;
+        IsComparisonInterrupted = false;
         IsModifyComparisonSummaryChecked = false;
         OpenLatestLogCommand.RaiseCanExecuteChanged();
 
@@ -440,19 +442,21 @@ class MainWindowViewModel : BindableBase
         }
     }
 
-    private bool CanInterruptComparison() => IsComparing;
+    private bool CanInterruptComparison() => IsComparing && !IsMakingRequirements;
 
     private void InterruptComparison()
     {
         if (!CanInterruptComparison()) return;
         IsComparisonInterrupted = true;
-        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process was interrupted and " +
-            "will end after the current run."));
+        _dialogService.ShowDialog("NotificationDialog", new DialogParameters("message=The comparison process was interrupted."));
+        killProcess("ExternalTool");
+        killProcess("EXCEL");
+        static void killProcess(string name) => Array.ForEach(Process.GetProcessesByName(name), p => p.Kill());
     }
 
 
     private bool CanOpenResult() =>
-        CompareRequest != null && File.Exists(_cliMgr.GetResultsPath(CompareRequest)) && !IsComparing;
+        CompareRequest != null && File.Exists(_cliMgr.GetResultsPath(CompareRequest)) && !IsComparing && !IsMakingRequirements;
 
 
     private void OpenResult()
@@ -468,7 +472,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanOpenFolder() =>
-        CompareRequest != null && Directory.Exists(_cliMgr.GetFolderPath(CompareRequest)) && !IsComparing;
+        CompareRequest != null && Directory.Exists(_cliMgr.GetFolderPath(CompareRequest)) && !IsComparing && !IsMakingRequirements;
 
 
     private void OpenFolder()
@@ -485,7 +489,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanDeleteItem() =>
-        SelectedItem != null && !IsComparing;
+        SelectedItem != null && !IsComparing && !IsMakingRequirements;
 
     private void DeleteItem()
     {
@@ -496,7 +500,7 @@ class MainWindowViewModel : BindableBase
     }
 
     private bool CanDeleteAllItems() =>
-        HasItems && !IsComparing;
+        HasItems && !IsComparing && !IsMakingRequirements;
 
     private void DeleteAllItems()
     {
@@ -546,7 +550,7 @@ class MainWindowViewModel : BindableBase
         {
             FileName = "File to Compare",
             DefaultExt = ".tar",
-            Filter = "(.tar)|*.tar|(.xml)|*.xml|All files (*.*)|*.*"
+            Filter = "Tar or XML files (*.tar;*.xml)|*.tar;*.xml|All files (*.*)|*.*"
         };
         bool? result = dialog.ShowDialog();
         if (result == true)
@@ -625,6 +629,7 @@ class MainWindowViewModel : BindableBase
         _logger.Information("User requested to make requirements.");
         Process[] pname = Process.GetProcessesByName("EXCEL");
         var fileExtension = Path.GetExtension(DraftItem!.ActualPath);
+
         var mode = fileExtension switch
         {
             ".tar" => "GE",
@@ -686,6 +691,7 @@ class MainWindowViewModel : BindableBase
         {
             var selectedProtocols = result.Parameters.GetValue<List<string>>("selectedItems");
             var request = new MakeReqRequest(DraftItem!.ActualPath!, selectedProtocols);
+            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Creating a requirements file from the selected protocols"));
             var exitCode = await _cliMgr.MakeReqAsync(request, selectedProtocols);
             if (exitCode != 0)
             {
@@ -934,13 +940,13 @@ class MainWindowViewModel : BindableBase
                 isValid = false;
                 _logger.Error("Requirements file path: {ReqPath} is invalid [line: {Index}].", record.ReqPath, index + 1);
             }
-            if (!Path.Exists(record.ActualPath) || Path.GetExtension(record.ActualPath) != ".tar")
+            if (!Path.Exists(record.ActualPath) && (Path.GetExtension(record.ActualPath) != ".tar" || Path.GetExtension(record.ActualPath) != ".xml"))
             {
                 isValid = false;
                 _logger.Error("Actual file path: {ActualPath} is invalid [line: {Index}].", record.ActualPath, index + 1);
             }
         }
-        _logger.Information($"Input file validation mode: {isValid}.");
+        _logger.Information($"Input file validation result: {isValid}.");
         return isValid;
     }
 
