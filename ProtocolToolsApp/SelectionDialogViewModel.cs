@@ -7,7 +7,16 @@ namespace ProtocoLab
     internal class SelectionDialogViewModel : DialogViewModelBase
     {
         private ObservableCollection<ProtocolItem> _protocols;
+        private ObservableCollection<ProtocolItem> _filteredProtocols;
         private bool _hasSelectedItems;
+        private string _filterText = string.Empty;
+
+        public ObservableCollection<ProtocolItem> FilteredProtocols
+        {
+            get => _filteredProtocols;
+            set => SetProperty(ref _filteredProtocols, value);
+        }
+
         public ObservableCollection<ProtocolItem> Protocols
         {
             get => _protocols;
@@ -18,6 +27,9 @@ namespace ProtocoLab
                     _protocols.CollectionChanged += Protocols_CollectionChanged;
                     foreach (var item in _protocols)
                         item.PropertyChanged += ProtocolItem_PropertyChanged;
+                    
+                    // Initialize filtered protocols with all items
+                    FilteredProtocols = new ObservableCollection<ProtocolItem>(_protocols);
                 }
             }
         }
@@ -25,6 +37,18 @@ namespace ProtocoLab
         {
             get => _hasSelectedItems;
             set => SetProperty(ref _hasSelectedItems, value);
+        }
+
+        public string FilterText
+        {
+            get => _filterText;
+            set
+            {
+                if (SetProperty(ref _filterText, value))
+                {
+                    ApplyFilter();
+                }
+            }
         }
 
         public DelegateCommand ConfirmCommand { get; private set; }
@@ -38,6 +62,7 @@ namespace ProtocoLab
         {
             Title = "Protocols Selection";
             _protocols = new ObservableCollection<ProtocolItem>();
+            _filteredProtocols = new ObservableCollection<ProtocolItem>();
             Protocols = _protocols;
             ConfirmCommand = new DelegateCommand(ConfirmDialog, CanConfirmDialog);
             CancelCommand = new DelegateCommand(CancelDialog);
@@ -53,6 +78,23 @@ namespace ProtocoLab
                 var protocolList = parameters.GetValue<List<string>>("items");
                 Protocols = new ObservableCollection<ProtocolItem>(
                     protocolList.Select(p => new ProtocolItem { Name = p, IsSelected = false })
+                );
+            }
+        }
+
+        private void ApplyFilter()
+        {
+            if (string.IsNullOrWhiteSpace(_filterText))
+            {
+                // If filter is empty, show all items
+                FilteredProtocols = new ObservableCollection<ProtocolItem>(_protocols);
+            }
+            else
+            {
+                FilteredProtocols = new ObservableCollection<ProtocolItem>(
+                    _protocols.Where(p =>
+                        p.Name.Contains(_filterText, StringComparison.OrdinalIgnoreCase)
+                    )
                 );
             }
         }
@@ -95,6 +137,7 @@ namespace ProtocoLab
                     break;
             }
             ConfirmCommand.RaiseCanExecuteChanged();
+            ApplyFilter(); // Re-apply the filter after the collection is changed.
         }
 
         private void ProtocolItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -110,13 +153,13 @@ namespace ProtocoLab
 
         private void SelectAll()
         {
-            foreach(var item in  _protocols)
+            foreach(var item in  FilteredProtocols)
                 item.IsSelected = true;
         }
 
         private void UnselectAll()
         {
-            foreach (var item in _protocols)
+            foreach (var item in FilteredProtocols)
                 item.IsSelected = false;
         }
     }
