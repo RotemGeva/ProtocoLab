@@ -14,7 +14,6 @@ using System.Collections.Specialized;
 using ICSharpCode.SharpZipLib.Tar;
 using System.Text.RegularExpressions;
 using Path = System.IO.Path;
-using DryIoc;
 
 namespace ProtocoLab;
 
@@ -691,8 +690,17 @@ class MainWindowViewModel : BindableBase
         {
             var selectedProtocols = result.Parameters.GetValue<List<string>>("selectedItems");
             var request = new MakeReqRequest(DraftItem!.ActualPath!, selectedProtocols);
-            await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Creating a requirements file from the selected protocols"));
-            var exitCode = await _cliMgr.MakeReqAsync(request, selectedProtocols);
+            // Create progress instance.
+            var progressReporter = new Progress<(double progress, string message)>();
+            // Send progress instance to CLI (updates) and ProgressDialog (listens) - OnDialogOpen -> subscribe to "ProgressChanged" event. 
+            IDialogParameters dialogParameters = new DialogParameters
+            {
+                { "progressReporter", progressReporter},
+            };
+            // Make sure to handle failiure -> if fails in CLI report 100 to progress.
+            _dialogService.Show("ProgressDialog", dialogParameters, null);
+            //await _dialogService.ShowDialogAsync("NotificationDialog", new DialogParameters("message=Creating a requirements file from the selected protocols"));
+            var exitCode = await _cliMgr.MakeReqAsync(request, selectedProtocols, progressReporter);
             if (exitCode != 0)
             {
                 _logger.Error("Make requirements with parameters: {@Request} failed", request);

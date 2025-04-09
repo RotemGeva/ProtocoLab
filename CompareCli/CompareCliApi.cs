@@ -1,5 +1,6 @@
 ﻿using Serilog;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 
 namespace CompareCli;
@@ -25,6 +26,7 @@ public static class CompareCliApi
         private string ExternalToolDataDir => Path.Combine(ExternalToolDir, "Data");
 
         private string ExternalToolExePath => Path.Combine(ExternalToolDir, "ExternalTool.exe");
+
 
         /// <summary>
         /// Handling parsing XML requests with external tool.
@@ -70,12 +72,13 @@ public static class CompareCliApi
         /// <param name="protocols">Protocols to preserve in requirements file.</param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public async Task<int> MakeReqAsync(MakeReqRequest request, List<string> protocols, CancellationToken ct = default)
+        public async Task<int> MakeReqAsync(MakeReqRequest request, List<string> protocols, IProgress<(double progress, string message)> progress, CancellationToken ct = default)
         {
             var resultDir = Path.Combine(ExternalToolDataDir, "Requirements");
             Directory.CreateDirectory(resultDir);
             var a = protocols.ToArray();
             _logger.Debug("Making requirements. The request: {@Request}", request);
+
             ProcessStartInfo startInfo = new()
             {
                 FileName = ExternalToolExePath,
@@ -87,17 +90,29 @@ public static class CompareCliApi
 
             ProcessExtensions.StartProcessRequest startRequest = new(startInfo);
 
-            startRequest.OnOutputLine += (line) => _logger.Debug(line);
+            startRequest.OnOutputLine += (line) =>
+            {
+                //_logger.Debug(line);
+
+                var match = Regex.Match(line, @"Progress:\s*(\d+\.\d+)%\s*-\s*(.*)");
+                if (match.Success)
+                {
+                    var progressPercentage = double.Parse(match.Groups[1].Value); // Progress percentage
+                    var message = match.Groups[2].Value;  // The message after the progress
+                    _logger.Debug($"CLI: Progress: {progressPercentage}% - Message: {message}");
+                    progress.Report((progressPercentage, message));
+                }
+            };
+
             startRequest.OnErrorLine += (line) => _logger.Warning(line);
-
+            
             _logger.Debug("Starting external tool with request: {@Request}", startRequest);
-
             killProcesses("EXCEL");
             var exitCode = await startRequest.RunProcessAsync().ConfigureAwait(false);
             killProcesses("EXCEL");
-
             _logger.Debug("External tool done with code: {ExitCode}", exitCode);
-
+            if (exitCode != 0)
+                progress.Report((100, "Process failed"));
             return exitCode;
         }
 
