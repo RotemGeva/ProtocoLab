@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using ProtocolsToolApp;
+using Serilog;
 using Serilog.Events;
 using System.IO;
 using System.Windows;
@@ -24,7 +25,7 @@ public partial class App : PrismApplication
         /// Logging must be initialized before any type registration that uses logging.
         LoggerConfiguration loggerConfiguration = new LoggerConfiguration()
         .Enrich.WithThreadId()
-        .MinimumLevel.Is(LogEventLevel.Verbose);
+        .MinimumLevel.Is(LogEventLevel.Debug);
 
         loggerConfiguration.WriteTo.File(
             path: "Logs/ProtocoLab.log",
@@ -43,7 +44,8 @@ public partial class App : PrismApplication
         containerRegistry.RegisterDialog<SelectionDialog, SelectionDialogViewModel>();
         containerRegistry.RegisterDialog<NotificationDialog, NotificationDialogViewModel>();
         containerRegistry.RegisterDialog<YesNoDialog, YesNoDialogViewModel>();
-    }
+        containerRegistry.RegisterDialog<ProgressDialog, ProgressDialogViewModel>();
+    }   
 
     protected override void OnInitialized()
     {
