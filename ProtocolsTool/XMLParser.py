@@ -2,7 +2,6 @@ import os.path
 import re
 import xml.etree.ElementTree as ET
 import openpyxl
-
 from Protocol import Protocol
 from Parameter import Parameter
 from Sequence import Sequence
@@ -45,17 +44,36 @@ class XMLParser:
             logging.warning(f'Failed to retrieve MR information from Siemens line. error: {e}')
             raise Exception()
 
-    def get_all_protocol_elements(self) -> list[ET]:
+    def get_protocol_elements(self, relevant_protocols: list[str] = None) -> list[ET]:
         """
         Finds all protocol title elements that are found under "program" tag.
+        If relevant protocols is None - retrieves all protocols found in file.
+        :type relevant_protocols: protocols to get.
         :return: A list of all the protocol title elements.
         """
-        logging.info(f'Retrieving all protocols elements from root...')
+        if relevant_protocols is None:
+            logging.info('Retrieving all protocol elements from root.')
+        else:
+            logging.info(f'Retrieving the following protocols from root: {relevant_protocols}')
         protocols: list[ET] = []
         for protocol in self.root.iter('program'):
-            protocols.append(protocol)
-        logging.info(f'Found {len(protocols)} protocols within the whole file...')
+            if relevant_protocols is None or protocol.get('name') in relevant_protocols:
+                protocols.append(protocol)
+        logging.info(f'Found {len(protocols)} protocols within the given file...')
         return protocols
+
+    def get_all_sequence_elements(self) -> list[ET]:
+        """
+        Finds all sequence elements that contain sequence parameters values.
+        Each sequence (and its parameters) is enclosed by "PrintProtocol" tag.
+        :return: A list of all the sequence elements.
+        """
+        sequence_elements: list[ET] = []
+        logging.info('Retrieving all sequence elements in file.')
+        for sequence_element in self.root.iter('PrintProtocol'):  # Iter does not preserve the order of the elements
+            sequence_elements.append(sequence_element)
+        logging.info(f'Found {len(sequence_elements)} sequences within the whole xml file.')
+        return sequence_elements
 
     def output_all_protocol_names(self, output_path='Data\\temp') -> None:
         """
@@ -73,18 +91,88 @@ class XMLParser:
             logging.error(f'Failed to export protocols names. error: {e}')
             raise Exception()
 
-    def get_all_sequence_elements(self) -> list[ET]:
+    def fill_in_parameters(self, sequence_element: ET, sequence: Sequence) -> None:
         """
-        Finds all sequence elements that contain sequence parameters values.
-        Each sequence (and its parameters) is enclosed by "PrintProtocol" tag.
-        :return: A list of all the sequence elements.
+        Fills out the parameters in the given sequence.
+        :param self:
+        :param sequence_element: The xml element that contains the information regarding the parameters.
+        :param sequence: The sequence object that should be filled with the parameters.
         """
-        logging.info('Retrieving all sequences elements from root...')
-        sequence_elements: list[ET] = []
-        for sequence_element in self.root.iter('PrintProtocol'):  # Iter does not preserve the order of the elements
-            sequence_elements.append(sequence_element)
-        logging.info(f'Found {len(sequence_elements)} sequences within the whole xml file.')
-        return sequence_elements
+        logging.info(f'Filling out parameters for: {sequence.name}...')
+        for prot_parameter in sequence_element.iter('ProtParameter'):
+            name = prot_parameter.find('Label').text
+            value = prot_parameter.find('ValueAndUnit').text.strip()
+            parameter = Parameter(name, value)
+            logging.info(f'Adding parameter: {parameter}...')
+            sequence.add_parameter(parameter)
+        scan_time = self.get_scan_time(sequence_element)
+        scan_time_parameter = Parameter('Scan Time', scan_time)
+        logging.info(f'Adding scan time parameter: {scan_time_parameter}...')
+        sequence.add_parameter(scan_time_parameter)
+
+    def get_mr_home_info(self, protocol: ET) -> tuple:
+        """
+        Finds the last sequence of the protocol (the identifier sequence, a dummy sequence that contains a description of
+        the MR)
+        :param protocol: The protocol that contains the dummy sequence. Currently, every protocol contains the
+        dummy sequence.
+        :return: A tuple that the first element contain the type of the MR (e.g. Lumina-VA50) and the
+        second elements contains the field strength (e.g. 3T).
+        """
+        try:
+            protocol_name = protocol.get('name')
+            logging.info(f'Retrieving MR general info from last sequence of {protocol_name}...')
+            sequences = list(protocol.iter('NormalStep_decision_branch'))
+            last_sequence = sequences[-1] if sequences else None
+            last_sequence_name = last_sequence.get('name')
+            last_sequence_name = last_sequence_name.replace('*', '').strip()  # Remove asterisks
+            info = last_sequence_name.split('_')
+            sw_type = f'{info[1]}-{info[2]}'  # Info[1] - e.g. VE11, info[2] - e.g. Prisma.
+            field_strength = info[0]
+            logging.info(f'Successfully retrieved: {sw_type}, {field_strength}')
+            return sw_type, field_strength
+        except Exception as e:
+            logging.warning(f'Failed to retrieve mr information from last sequence. error: {e}')
+            self.get_mr_siemens_info()
+
+    @staticmethod
+    def delete_unused_sequences(xml_handler, protocols: list[str]) -> list[ET]:
+        sequence_elements_in_protocols = []
+        sequence_elements = xml_handler.get_all_sequence_elements()
+        for sequence_element in sequence_elements:
+            protocol_name = XMLParser.get_protocol_of_sequence(sequence_element)
+            if protocol_name in protocols:
+                sequence_elements_in_protocols.append(sequence_element)
+        return sequence_elements_in_protocols
+
+    @staticmethod
+    def parse(xml_filepath, mr_name, output_path='Data\\temp', relevant_protocols: list[str] = None) -> None:
+        """
+        Handles all xml parsing in high level.
+        :param relevant_protocols: Protocols found in requirements.
+        :param xml_filepath: Filepath of the xml file.
+        :param mr_name: The MR type.
+        :param output_path: Output full path for exporting yaml.
+        """
+        # Parse xml file
+        xml_handler = XMLParser(xml_filepath)
+
+        # Retrieve all relevant elements
+        protocol_elements = xml_handler.get_protocol_elements(relevant_protocols)
+        if relevant_protocols is None:
+            sequence_elements = xml_handler.get_all_sequence_elements()
+        else:
+            sequence_elements = XMLParser.delete_unused_sequences(xml_handler, relevant_protocols)
+
+        # Retrieve general info regrading MR type and field strength
+        mr_type, field_strength = xml_handler.get_mr_home_info(protocol_elements[0])
+
+        # Parse xml file into protocols list
+        protocols_list = xml_handler.create_protocols(xml_handler, mr_type, field_strength, protocol_elements,
+                                                      sequence_elements)
+
+        # Dump protocols to json
+        XMLParser.export_parsing(xml_handler, protocols_list, output_path, mr_name)
 
     @staticmethod
     def get_all_sequences_names(protocol: ET) -> list[str]:
@@ -102,55 +190,12 @@ class XMLParser:
         return sequences_names
 
     @staticmethod
-    def fill_in_parameters(sequence_element: ET, sequence: Sequence) -> None:
-        """
-        Fills out the parameters in the given sequence.
-        :param sequence_element: The xml element that contains the information regarding the parameters.
-        :param sequence: The sequence object that should be filled with the parameters.
-        """
-        logging.info(f'Filling out parameters for: {sequence.name}...')
-        for prot_parameter in sequence_element.iter('ProtParameter'):
-            name = prot_parameter.find('Label').text
-            value = prot_parameter.find('ValueAndUnit').text.strip()
-            parameter = Parameter(name, value)
-            logging.info(f'Adding parameter: {parameter}...')
-            sequence.add_parameter(parameter)
-        scan_time = XMLParser.get_scan_time(sequence_element)
-        scan_time_parameter = Parameter('Scan Time', scan_time)
-        logging.info(f'Adding scan time parameter: {scan_time_parameter}...')
-        sequence.add_parameter(scan_time_parameter)
-
-    def get_mr_home_info(self, protocol: ET) -> tuple:
-        """
-        Finds the last sequence of the protocol (the identifier sequence, a dummy sequence that contains a description of
-        the MR)
-        :param protocol: The protocol that contains the dummy sequence. Currently, every protocol contains the
-        dummy sequence.
-        :return: A tuple that the first element contain the type of the MR (e.g. Lumina-VA50) and the
-        second elements contains the field strength (e.g. 3T).
-        """
-        try:
-            protocol_name = protocol.get('name')
-            logging.info(f'Retrieving MR general info from last sequence of {protocol_name}...')
-            for sequence in protocol.iter('NormalStep_decision_branch'):
-                sequence_name = sequence.get('name')
-                if sequence_name.__contains__('*'):
-                    info = sequence_name.split('_')
-                    sw_type = f'{info[1]}-{info[2]}'  # Info[1] - e.g. Lumina, info[2] - e.g. VA50.
-                    field_strength = info[0].split(' ')[1]
-                    logging.info(f'Successfully retrieved: {sw_type}, {field_strength}')
-                    return sw_type, field_strength
-        except Exception as e:
-            logging.warning(f'Failed to retrieve mr information from last sequence. error: {e}')
-            self.get_mr_siemens_info()
-
-    @staticmethod
-    def custom_serializer(obj):
+    def custom_serializer(obj) -> dict:
         if hasattr(obj, 'to_dict'):  # Check if the object has a 'to_dict' method
             return obj.to_dict()
 
     @staticmethod
-    def create_protocols(xml_handler, mr_type, field_strength, protocol_elements, sequence_elements):
+    def create_protocols(xml_handler, mr_type, field_strength, protocol_elements, sequence_elements) -> list[Protocol]:
         """
         Creates the protocol list structure.
         :param xml_handler: XML object.
@@ -183,32 +228,14 @@ class XMLParser:
         return protocols_list
 
     @staticmethod
-    def parse(xml_filepath, mr_name, output_path='Data\\temp'):
+    def export_parsing(xml_handler, protocols_list, output_path, mr_name) -> None:
         """
-        Handles all xml parsing in high level.
-        :param xml_filepath: Filepath of the xml file.
-        :param mr_name: The MR type.
-        :param output_path: Output full path for exporting yaml.
+        Exports Protocol structure into yaml.
+        :param xml_handler: xml object that contains the xml file.
+        :param protocols_list: contains all the protocol elements (Protocol type).
+        :param output_path: output path of the exported yaml.
+        :param mr_name: file will be exported under output path\mr name folder.
         """
-        # Parse xml file
-        xml_handler = XMLParser(xml_filepath)
-
-        # Retrieve all relevant elements
-        protocol_elements = xml_handler.get_all_protocol_elements()
-        sequence_elements = xml_handler.get_all_sequence_elements()
-
-        # Retrieve general info regrading MR type and field strength
-        mr_type, field_strength = xml_handler.get_mr_home_info(protocol_elements[0])
-
-        # Parse xml file into protocols list
-        protocols_list = xml_handler.create_protocols(xml_handler, mr_type, field_strength, protocol_elements,
-                                                      sequence_elements)
-
-        # Dump protocols to json
-        XMLParser.export_parsing(xml_handler, protocols_list, output_path, mr_name)
-
-    @staticmethod
-    def export_parsing(xml_handler, protocols_list, output_path, mr_name):
         logging.info('Exporting the parsed file...')
         protocols_dict = [protocol.to_dict() for protocol in protocols_list]
         data = json.dumps(protocols_dict, default=xml_handler.custom_serializer, indent=4)
@@ -244,6 +271,11 @@ class XMLParser:
 
     @staticmethod
     def get_protocol_of_sequence(sequence: ET) -> str:
+        """
+        Returns the name of the protocol from a given sequence element.
+        :param sequence: sequence element.
+        :return: name of the protocol.
+        """
         full_path = sequence.find('.//HeaderProtPath').text
         name = os.path.basename(os.path.dirname(full_path))
         return name
@@ -276,10 +308,6 @@ class XMLParser:
         return None
 
 
-
-
 if __name__ == '__main__':
-    parse = XMLParser('VA50_LUMINA.xml')
-    sequences = parse.get_all_sequence_elements()
-    XMLParser.get_scan_time(sequences[0])
-
+    xml = XMLParser('VE11E_Aera.xml')
+    xml.parse('VE11E_Aera.xml', "bla")

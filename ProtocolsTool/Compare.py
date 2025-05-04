@@ -6,8 +6,9 @@ import openpyxl
 import win32com.client
 import sys
 import tarfile
-
+from ApplicationParameters import ApplicationParameters
 from XMLParser import XMLParser
+from ProtocolExtractor import ProtocolExtractor
 import utils
 import re
 
@@ -19,7 +20,12 @@ def resource_path(relative_path):
 
 
 def remove_readonly(func, path, exc_info):
-    # Change file/folder to be writable before attempting to delete
+    """
+    Change file/folder to be writable before attempting to delete.
+    :param func:
+    :param path: path to remove read-only attributes from.
+    :param exc_info:
+    """
     logging.info(f'Failed to delete {path}. removing read-only attribute...')
     os.chmod(path, stat.S_IWRITE)  # Removes read-only attribute
     func(path)
@@ -31,13 +37,14 @@ class Compare:
         try:
             self.parameters = parameters
             self.handle_extraction(self.parameters.mr_vendor)
-            if self.parameters.mr_vendor == 'GE':
+            if self.parameters.mr_vendor == ApplicationParameters.GE:
                 self.handle_moving_protocols()
                 siemens_sw_type = None
-            elif self.parameters.mr_vendor == 'Siemens':
+            elif self.parameters.mr_vendor == ApplicationParameters.SIEMENS:
                 siemens_sw_type = utils.read_mr_sw_type()
-            utils.handle_protocol_extractor(self.parameters.mr_name, self.parameters.mr_vendor,
-                                            siemens_sw_type, is_comparing=True)
+            pe = ProtocolExtractor(self.parameters.mr_name, self.parameters.mr_vendor,
+                                   siemens_sw_type, is_comparing=True)
+            pe.handle_protocol_extractor()
             self.prepare_comparison_file()
             self.activate_macros()
             self.compare()
@@ -230,11 +237,17 @@ class Compare:
         if os.path.exists(dest_folder):
             logging.info(f'The folder: {dest_folder} already exists.')
             self.manage_folder(dest_folder, recreate=True)
+        else:
+            logging.info(f'The folder: {dest_folder} does not exist. Creating folder...')
+            os.mkdir(dest_folder)
+        logging.info(f'Extracting using mode: {mode}')
         match mode.lower():
             case 'ge':
                 self.extract_tar(filepath=self.parameters.actual_path, dest_folder_path=dest_folder)
             case 'siemens':
-                XMLParser.parse(self.parameters.actual_path, self.parameters.mr_name)
+                protocols_in_req = self.get_sheetsnames(self.parameters.req_path)
+                XMLParser.parse(self.parameters.actual_path, self.parameters.mr_name,
+                                relevant_protocols=protocols_in_req)
 
     @staticmethod
     def manage_folder(folder_path: str, recreate: bool = True) -> None:
@@ -285,7 +298,6 @@ class Compare:
         try:
             logging.info(f'Opening: {filepath}...')
             file = openpyxl.load_workbook(filepath)
-            logging.info('Retrieving sheets names...')
             sheet_names = file.sheetnames
             logging.info(f'Retrieved the following sheets names: {sheet_names}.')
             return sheet_names

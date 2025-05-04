@@ -2,17 +2,18 @@ import os
 
 
 class ApplicationParameters:
+    GE = 'GE'
+    SIEMENS = 'Siemens'
+
     def __init__(self, mr_name, actual_path, req_path=None, protocols=None):
-        self.macro_excel_file = str(f'{os.getcwd()}\\PY_PERSONAL.XLSB')
         self.req_path = req_path
         self.actual_path = actual_path
         self.mr_name = mr_name
         self.mr_vendor = self.get_mr_vendor()
-        # TODO: Complete scenarios of macro filepath
-        if self.mr_vendor == 'GE':
-            pass
-        elif self.mr_vendor == 'Siemens':
-            pass
+        if self.mr_vendor == self.GE:
+            self.macro_excel_file = str(f'{os.getcwd()}\\GE_PY_PERSONAL.XLSB')
+        elif self.mr_vendor == self.SIEMENS:
+            self.macro_excel_file = str(f'{os.getcwd()}\\SIEMENS_PY_PERSONAL.XLSB')
         if protocols is None:
             self.protocols = []
         else:
@@ -22,9 +23,9 @@ class ApplicationParameters:
         extension = os.path.splitext(self.actual_path)[1]
         match extension:
             case '.tar':
-                return 'GE'
+                return self.GE
             case '.xml':
-                return 'Siemens'
+                return self.SIEMENS
 
     def __str__(self):
         return (

@@ -2,9 +2,12 @@ import logging
 import os
 import sys
 import utils
+from ProtocolExtractor import ProtocolExtractor
 import openpyxl
 import win32com
-
+from ApplicationParameters import ApplicationParameters
+from XMLParser import XMLParser
+from utils import ProgressReporter
 
 def resource_path(relative_path):
     # """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -16,11 +19,20 @@ class Requirements:
     def __init__(self, parameters):
         logging.info(f'***** Make Requirement *****')
         try:
+            ProgressReporter.report_progress("Initializing making requirements")
             self.parameters = parameters
-            siemens_sw_type = utils.read_mr_sw_type()
-            utils.handle_protocol_extractor(self.parameters.mr_name, self.parameters.mr_vendor,
-                                            siemens_sw_type, is_comparing=False)
+            if os.path.splitext(self.parameters.actual_path)[1] == '.xml':
+                xml_object = XMLParser(self.parameters.actual_path)
+                xml_object.parse(self.parameters.actual_path, self.parameters.mr_name,
+                                 relevant_protocols=self.parameters.protocols)
+            siemens_sw_type = utils.read_mr_sw_type() if (self.parameters.mr_vendor ==
+                                                          ApplicationParameters.SIEMENS) else None
+            pe = ProtocolExtractor(self.parameters.mr_name, self.parameters.mr_vendor,
+                                   siemens_sw_type, is_comparing=False)
+            pe.handle_protocol_extractor()
+            ProgressReporter.report_progress(message="Activating macros")
             self.excel_rearrangement()
+            ProgressReporter.report_progress(message="Finish")
             logging.info(f'***** Make Requirement Done *****')
         except Exception as err:
             logging.error(f'Error during making requirements process: {err}.')
@@ -83,7 +95,8 @@ class Requirements:
                 Filename=f"{os.getcwd()}\\Data\\Requirements\\{self.parameters.mr_name}_Requirements.xlsx")
         except Exception as err:
             logging.info(f'Failed to open excel file: {self.parameters.mr_name}_Requirements.xlsx.\nError: {err}')
-            raise Exception(f'Failed to open macro excel file: {self.parameters.mr_name}_Requirements.xlsx.\nError: {err}')
+            raise Exception(
+                f'Failed to open macro excel file: {self.parameters.mr_name}_Requirements.xlsx.\nError: {err}')
         # run macro
         try:
             logging.info(f'Running macro: MakeReqDocForAllSheets...')
